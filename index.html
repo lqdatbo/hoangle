@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resident Room Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-6 font-sans">
+
+  <div class="max-w-[1800px] mx-auto">
+    <div class="flex justify-between items-center mb-6">
+      <div>
+        <h1 class="text-3xl font-bold">Resident Room Dashboard</h1>
+        <p class="text-gray-500 mt-1">Theo dõi tình trạng phòng và khách lưu trú</p>
+      </div>
+
+      <div class="flex gap-4">
+        <div class="bg-white rounded-2xl shadow p-4 text-center w-36">
+          <div class="text-gray-400">Tổng phòng</div>
+          <div id="totalRooms" class="text-2xl font-bold"></div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow p-4 text-center w-36">
+          <div class="text-gray-400">Đang sử dụng</div>
+          <div id="occupiedRooms" class="text-2xl font-bold text-blue-600"></div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow p-4 text-center w-36">
+          <div class="text-gray-400">Phòng trống</div>
+          <div id="emptyRooms" class="text-2xl font-bold text-green-600"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-3xl shadow overflow-auto border">
+      <div id="dashboard"></div>
+    </div>
+  </div>
+
+  <script>
+    // =========================
+    // GOOGLE SHEET CONFIG
+    // =========================
+
+    // Bước 1:
+    // Publish Google Sheet -> Anyone with the link
+    //
+    // Bước 2:
+    // Thay YOUR_SHEET_ID bằng ID Google Sheet
+    //
+    // Ví dụ:
+    // https://docs.google.com/spreadsheets/d/1abcXYZ123456/edit
+    // => SHEET_ID = 1abcXYZ123456
+
+    const SHEET_ID = '2PACX-1vT3-E9TMTL4xS34qZ5vqRnFV3K7Uxrjom192qeT4WWulssmN-mEmXCasIkysBS9oC8BO2zwYZw7gCxG';
+    const SHEET_NAME = 'DATA';
+
+    const API_URL = `https://opensheet.elk.sh/${SHEET_ID}/${SHEET_NAME}`;
+
+    // =========================
+    // ROOM LIST
+    // =========================
+
+    const roomList = [
+      '301','302','303',
+      '401','402','403',
+      '501','502','503',
+      '601','602','603',
+      '701','702','703',
+      '801','802','803',
+      '901','902'
+    ];
+
+    const today = new Date();
+
+    function formatDate(date) {
+      return date.toISOString().split('T')[0];
+    }
+
+    function isToday(date) {
+      return formatDate(date) === formatDate(today);
+    }
+
+    function isWithinStay(day, arrival, departure) {
+      const d = new Date(formatDate(day));
+      return d >= new Date(arrival) && d <= new Date(departure);
+    }
+
+    function daysToCheckout(departure) {
+      const dep = new Date(departure);
+      const diff = dep - today;
+      return Math.ceil(diff / (1000 * 60 * 60 * 24));
+    }
+
+    async function loadDashboard() {
+      try {
+        const response = await fetch(API_URL);
+        const data = await response.json();
+
+        const residents = data.map(r => ({
+          room: r.Room || '',
+          name: r.Name || '',
+          nationality: r.Nationality || '',
+          passport: r.Passport || '',
+          arrival: r.Arrival || '',
+          departure: r.Departure || ''
+        }));
+
+        renderDashboard(residents);
+
+      } catch (error) {
+        console.error(error);
+
+        document.getElementById('dashboard').innerHTML = `
+          <div class="p-10 text-center text-red-600">
+            Không thể kết nối Google Sheet.<br><br>
+            Kiểm tra lại:<br>
+            - SHEET_ID<br>
+            - Tên Sheet<br>
+            - Quyền public Google Sheet
+          </div>
+        `;
+      }
+    }
+
+    function renderDashboard(residents) {
+
+      const occupiedRooms = [...new Set(residents.map(r => r.room))];
+
+      document.getElementById('totalRooms').innerText = roomList.length;
+      document.getElementById('occupiedRooms').innerText = occupiedRooms.length;
+      document.getElementById('emptyRooms').innerText = roomList.length - occupiedRooms.length;
+
+      const dashboard = document.getElementById('dashboard');
+
+      const days = [];
+      for (let i = -5; i < 25; i++) {
+        const d = new Date();
+        d.setDate(today.getDate() + i);
+        days.push(d);
+      }
+
+      let html = '';
+
+      html += `
+        <div class="grid sticky top-0 bg-white z-20 border-b"
+            style="grid-template-columns:120px 320px repeat(${days.length}, 36px)">
+
+          <div class="p-3 border-r font-bold">Phòng</div>
+          <div class="p-3 border-r font-bold">Khách</div>
+
+          ${days.map(day => `
+            <div class="text-center text-xs border-r p-2 font-semibold ${isToday(day) ? 'bg-yellow-300' : 'bg-gray-50'}">
+              ${day.getDate()}
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      roomList.forEach(room => {
+
+        const roomResidents = residents.filter(r => r.room === room);
+
+        html += `
+          <div class="grid border-b hover:bg-gray-50"
+              style="grid-template-columns:120px 320px repeat(${days.length}, 36px)">
+
+            <div class="p-3 border-r font-semibold flex items-center sticky left-0 bg-white z-10">
+              ${room}
+            </div>
+
+            <div class="p-3 border-r space-y-2">
+
+              ${roomResidents.length === 0
+                ? '<div class="text-green-600 font-medium">Phòng trống</div>'
+                : roomResidents.map(r => {
+
+                    const checkoutDays = daysToCheckout(r.departure);
+
+                    let badge = '';
+
+                    if (checkoutDays <= 3 && checkoutDays >= 0) {
+                      badge = '<span class="ml-2 text-xs bg-red-500 text-white px-2 py-1 rounded-full">Sắp checkout</span>';
+                    }
+
+                    return `
+                      <details class="bg-blue-50 rounded-xl p-2 border border-blue-100">
+
+                        <summary class="cursor-pointer text-blue-700 font-medium hover:underline flex items-center justify-between">
+                          <span>${r.name}</span>
+                          ${badge}
+                        </summary>
+
+                        <div class="mt-3 text-xs text-gray-700 space-y-2">
+                          <div><b>Passport:</b> ${r.passport}</div>
+                          <div><b>Nationality:</b> ${r.nationality}</div>
+                          <div><b>Arrival:</b> ${r.arrival}</div>
+                          <div><b>Departure:</b> ${r.departure}</div>
+                          <div><b>Số ngày còn lại:</b> ${checkoutDays}</div>
+                        </div>
+
+                      </details>
+                    `;
+                }).join('')
+              }
+            </div>
+
+            ${days.map(day => {
+              const occupied = roomResidents.some(r =>
+                isWithinStay(day, r.arrival, r.departure)
+              );
+
+              return `
+                <div class="border-r min-h-[100px] ${occupied
+                  ? 'bg-blue-400/70'
+                  : isToday(day)
+                    ? 'bg-yellow-100'
+                    : 'bg-white'}">
+                </div>
+              `;
+            }).join('')}
+
+          </div>
+        `;
+      });
+
+      dashboard.innerHTML = html;
+    }
+
+    loadDashboard();
+
+    // Auto refresh mỗi 60 giây
+    setInterval(loadDashboard, 60000);
+  </script>
+
+</body>
+</html>
