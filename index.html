@@ -5,36 +5,46 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Resident Room Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Tối ưu thanh cuộn trên mobile mượt hơn */
+    .custom-scrollbar::-webkit-scrollbar {
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #cbd5e1;
+      border-radius: 3px;
+    }
+  </style>
 </head>
-<body class="bg-gray-100 p-6 font-sans">
+<body class="bg-gray-100 p-3 sm:p-6 font-sans antialiased">
 
   <div class="max-w-[1800px] mx-auto">
-    <div class="flex justify-between items-center mb-6">
+    <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6">
       <div>
-        <h1 class="text-3xl font-bold">Resident Room Dashboard</h1>
-        <p class="text-gray-500 mt-1">Theo dõi tình trạng phòng và khách lưu trú</p>
+        <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">Resident Room Dashboard</h1>
+        <p class="text-gray-500 text-sm mt-1">Theo dõi tình trạng phòng và khách lưu trú</p>
       </div>
 
-      <div class="flex gap-4">
-        <div class="bg-white rounded-2xl shadow p-4 text-center w-36">
-          <div class="text-gray-400">Tổng phòng</div>
-          <div id="totalRooms" class="text-2xl font-bold"></div>
+      <div class="grid grid-cols-3 gap-2 sm:gap-4 w-full lg:w-auto">
+        <div class="bg-white rounded-xl shadow p-3 text-center">
+          <div class="text-xs sm:text-sm text-gray-400">Tổng phòng</div>
+          <div id="totalRooms" class="text-lg sm:text-2xl font-bold text-gray-700"></div>
         </div>
 
-        <div class="bg-white rounded-2xl shadow p-4 text-center w-36">
-          <div class="text-gray-400">Đang sử dụng</div>
-          <div id="occupiedRooms" class="text-2xl font-bold text-blue-600"></div>
+        <div class="bg-white rounded-xl shadow p-3 text-center">
+          <div class="text-xs sm:text-sm text-gray-400">Đang ở</div>
+          <div id="occupiedRooms" class="text-lg sm:text-2xl font-bold text-blue-600"></div>
         </div>
 
-        <div class="bg-white rounded-2xl shadow p-4 text-center w-36">
-          <div class="text-gray-400">Phòng trống</div>
-          <div id="emptyRooms" class="text-2xl font-bold text-green-600"></div>
+        <div class="bg-white rounded-xl shadow p-3 text-center">
+          <div class="text-xs sm:text-sm text-gray-400">Phòng trống</div>
+          <div id="emptyRooms" class="text-lg sm:text-2xl font-bold text-green-600"></div>
         </div>
       </div>
     </div>
 
-    <div class="bg-white rounded-3xl shadow overflow-auto border">
-      <div id="dashboard" class="overflow-x-auto"></div>
+    <div class="bg-white rounded-2xl shadow border overflow-hidden">
+      <div id="dashboard" class="overflow-x-auto custom-scrollbar"></div>
     </div>
   </div>
 
@@ -46,20 +56,14 @@
     const SHEET_NAME = 'DATA';
     const API_URL = `https://opensheet.elk.sh/${SHEET_ID}/${SHEET_NAME}`;
 
-    // =========================
-    // ROOM LIST
-    // =========================
-    const roomList = [
-      '301','302',
-      '401','402',
-      '501','502',
-      '601','602',
-      '701','702',
-      '801','802',
-      '901','902'
-    ];
-
+    const roomList = ['301','302','401','402','501','502','601','602','701','702','801','802','901','902'];
     const today = new Date();
+    today.setHours(0,0,0,0);
+
+    // Xác định mốc giới hạn lịch sử (-5 ngày)
+    const limitPastDate = new Date();
+    limitPastDate.setDate(today.getDate() - 5);
+    limitPastDate.setHours(0,0,0,0);
 
     function formatDate(date) {
       return date.toISOString().split('T')[0];
@@ -89,10 +93,8 @@
     function daysToCheckout(departure) {
       const dep = parseDate(departure);
       if (!dep) return null;
-      const now = new Date();
-      now.setHours(0,0,0,0);
       dep.setHours(0,0,0,0);
-      const diff = dep - now;
+      const diff = dep - today;
       return Math.ceil(diff / (1000 * 60 * 60 * 24));
     }
 
@@ -100,66 +102,79 @@
       try {
         const response = await fetch(API_URL);
         const data = await response.json();
-        const residents = data.map(r => ({
-          room: r.Room || '',
-          name: r.Name || '',
-          nationality: r.Nationality || '',
-          passport: r.Passport || '',
-          arrival: r.Arrival || '',
-          departure: r.Departure || ''
-        }));
+        
+        // MỌ LỌC CHÍNH: Loại bỏ hoàn toàn khách out trước mốc timeline (-5 ngày)
+        const residents = data
+          .map(r => ({
+            room: r.Room || '',
+            name: r.Name || '',
+            nationality: r.Nationality || '',
+            passport: r.Passport || '',
+            arrival: r.Arrival || '',
+            departure: r.Departure || ''
+          }))
+          .filter(r => {
+            const depDate = parseDate(r.departure);
+            if (!depDate) return true; // Giữ lại nếu không có ngày out rõ ràng
+            depDate.setHours(0,0,0,0);
+            return depDate >= limitPastDate; // Chỉ giữ khách có ngày out từ 5 ngày trước trở lại đây
+          });
+
         renderDashboard(residents);
       } catch (error) {
         console.error(error);
         document.getElementById('dashboard').innerHTML = `
-          <div class="p-10 text-center text-red-600">
-            Không thể kết nối Google Sheet.<br><br>
-            Kiểm tra lại:<br>
-            - SHEET_ID<br>
-            - Tên Sheet<br>
-            - Quyền public Google Sheet
+          <div class="p-10 text-center text-red-600 font-medium">
+            Không thể kết nối Google Sheet dữ liệu.
           </div>
         `;
       }
     }
 
     function renderDashboard(residents) {
-      const occupiedRooms = [...new Set(residents.map(r => r.room))];
+      // Tính toán số phòng đang thực sự có khách ở (ngày hôm nay nằm trong kỳ lưu trú)
+      const currentOccupiedRooms = new Set();
+      residents.forEach(r => {
+        if (isWithinStay(today, r.arrival, r.departure)) {
+          currentOccupiedRooms.add(r.room);
+        }
+      });
+
       document.getElementById('totalRooms').innerText = roomList.length;
-      document.getElementById('occupiedRooms').innerText = occupiedRooms.length;
-      document.getElementById('emptyRooms').innerText = roomList.length - occupiedRooms.length;
+      document.getElementById('occupiedRooms').innerText = currentOccupiedRooms.size;
+      document.getElementById('emptyRooms').innerText = roomList.length - currentOccupiedRooms.size;
 
       const dashboard = document.getElementById('dashboard');
 
-      // TĂNG SỐ NGÀY HIỂN THỊ: Từ -5 ngày trước đến 30 ngày sau (Tổng cộng ~35 ngày để cuộn mượt mà)
+      // THIẾT LẬP TIMELINE: Đúng 5 ngày trước và 30 ngày sau (Tổng cộng 35 ngày)
       const days = [];
-      for (let i = -5; i < 30; i++) {
+      for (let i = -5; i <= 30; i++) {
         const d = new Date();
         d.setDate(today.getDate() + i);
         days.push(d);
       }
 
-      // Định dạng chiều rộng các cột cố định (Phòng: 120px, Khách: 320px, Mỗi ngày: 45px để hiện rõ DD/MM)
-      const gridStyle = `grid-template-columns: 120px 320px repeat(${days.length}, 45px);`;
+      // Độ rộng tối ưu mobile: Phòng 75px, Khách 220px, Mỗi ô ngày 38px
+      const gridStyle = `grid-template-columns: 75px 220px repeat(${days.length}, 38px); min-width: 1600px;`;
 
       let html = '';
 
-      // THANH TIÊU ĐỀ NGÀY THÁNG
+      // TẠO TIÊU ĐỀ LỊCH
       html += `
-        <div class="grid sticky top-0 bg-white z-30 border-b" style="${gridStyle}">
-          <div class="p-3 border-r font-bold bg-white sticky left-0 z-40">Phòng</div>
-          <div class="p-3 border-r font-bold bg-white sticky left-[120px] z-40">Khách</div>
+        <div class="grid sticky top-0 bg-white z-30 border-b select-none text-gray-700" style="${gridStyle}">
+          <div class="p-3 border-r font-bold bg-gray-50 sticky left-0 z-40 text-center text-sm">Phòng</div>
+          <div class="p-3 border-r font-bold bg-gray-50 sticky left-[75px] z-40 text-sm">Khách lưu trú</div>
           ${days.map(day => {
             const dateNum = day.getDate();
             const monthNum = day.getMonth() + 1;
+            const isContrastMonth = monthNum % 2 === 0;
             
-            // Phân biệt màu nền tiêu đề theo tháng (Tháng chẵn dùng màu Slate nhạt, tháng lẻ dùng màu trắng)
-            const monthBg = monthNum % 2 === 0 ? 'bg-slate-100/80' : 'bg-white';
-            const todayBg = isToday(day) ? 'bg-yellow-300 z-10 font-bold text-black' : monthBg;
+            let bgHeader = isContrastMonth ? 'bg-slate-100/70' : 'bg-white';
+            if (isToday(day)) bgHeader = 'bg-yellow-300 font-bold text-black z-10';
 
             return `
-              <div class="text-center text-[11px] border-r py-2 flex flex-col justify-center font-semibold ${todayBg}">
-                <div>${dateNum < 10 ? '0' + dateNum : dateNum}</div>
+              <div class="text-center border-r py-1.5 flex flex-col justify-center text-xs border-gray-200/80 ${bgHeader}">
+                <div class="text-xs">${dateNum < 10 ? '0' + dateNum : dateNum}</div>
                 <div class="text-[9px] text-gray-400 font-normal">T${monthNum}</div>
               </div>
             `;
@@ -167,38 +182,45 @@
         </div>
       `;
 
-      // NỘI DUNG TỪNG PHÒNG
+      // ĐỔ DỮ LIỆU TỪNG DÒNG PHÒNG
       roomList.forEach(room => {
         const roomResidents = residents.filter(r => r.room === room);
 
         html += `
-          <div class="grid border-b hover:bg-gray-50 relative" style="${gridStyle}">
+          <div class="grid border-b border-gray-100 hover:bg-gray-50/50 relative" style="${gridStyle}">
             
-            <div class="p-3 border-r font-semibold flex items-center sticky left-0 bg-white z-20 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
+            <div class="p-3 border-r font-semibold flex items-center justify-center sticky left-0 bg-white z-20 text-gray-800 text-sm shadow-[1px_0_3px_rgba(0,0,0,0.04)]">
               ${room}
             </div>
 
-            <div class="p-3 border-r space-y-2 sticky left-[120px] bg-white z-20 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
+            <div class="p-2 border-r space-y-1.5 sticky left-[75px] bg-white z-20 shadow-[2px_0_4px_rgba(0,0,0,0.03)] overflow-hidden">
               ${roomResidents.length === 0
-                ? '<div class="text-green-600 font-medium text-sm">Phòng trống</div>'
+                ? '<div class="text-green-600 font-medium text-xs p-1">Phòng trống</div>'
                 : roomResidents.map(r => {
                     const checkoutDays = daysToCheckout(r.departure);
                     let badge = '';
-                    if (checkoutDays <= 3 && checkoutDays >= 0) {
-                      badge = '<span class="ml-2 text-xs bg-red-500 text-white px-2 py-0.5 rounded-full">Sắp checkout</span>';
+                    
+                    // Logic tính toán Badge trạng thái hiển thị trực quan
+                    if (checkoutDays < 0) {
+                      badge = '<span class="text-[10px] bg-gray-400 text-white px-1.5 py-0.5 rounded-md">Đã out</span>';
+                    } else if (checkoutDays <= 3) {
+                      badge = '<span class="text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded-md animate-pulse">Sắp out</span>';
+                    } else {
+                      badge = '<span class="text-[10px] bg-blue-500 text-white px-1.5 py-0.5 rounded-md">Ở dài</span>';
                     }
+
                     return `
-                      <details class="bg-blue-50 rounded-xl p-2 border border-blue-100 text-sm">
-                        <summary class="cursor-pointer text-blue-700 font-medium hover:underline flex items-center justify-between">
-                          <span class="truncate max-w-[150px]">${r.name}</span>
+                      <details class="bg-slate-50/80 rounded-lg p-1.5 border border-slate-200/60 text-xs">
+                        <summary class="cursor-pointer text-blue-700 font-medium hover:underline flex items-center justify-between gap-1 outline-none">
+                          <span class="truncate block max-w-[110px] uppercase text-[11px]">${r.name}</span>
                           ${badge}
                         </summary>
-                        <div class="mt-3 text-xs text-gray-700 space-y-1">
-                          <div><b>Passport:</b> ${r.passport}</div>
-                          <div><b>Nationality:</b> ${r.nationality}</div>
-                          <div><b>Arrival:</b> ${r.arrival}</div>
-                          <div><b>Departure:</b> ${r.departure}</div>
-                          <div><b>Số ngày còn lại:</b> ${checkoutDays} ngày</div>
+                        <div class="mt-2 pt-1.5 border-t border-dashed border-gray-200 text-[11px] text-gray-600 space-y-1 select-text">
+                          <div><b>PP:</b> ${r.passport}</div>
+                          <div><b>Quốc tịch:</b> ${r.nationality}</div>
+                          <div><b>In:</b> ${r.arrival}</div>
+                          <div><b>Out:</b> ${r.departure}</div>
+                          <div><b>Còn lại:</b> ${checkoutDays < 0 ? 'Đã hết hạn' : checkoutDays + ' ngày'}</div>
                         </div>
                       </details>
                     `;
@@ -207,28 +229,29 @@
             </div>
 
             ${days.map(day => {
-              const residentInDay = roomResidents.find(r =>
-                isWithinStay(day, r.arrival, r.departure)
-              );
+              const residentInDay = roomResidents.find(r => isWithinStay(day, r.arrival, r.departure));
 
               let bgClass = 'bg-white';
               if (residentInDay) {
                 const checkoutDays = daysToCheckout(residentInDay.departure);
-                bgClass = (checkoutDays <= 3 && checkoutDays >= 0) ? 'bg-red-400' : 'bg-blue-400/70';
-              } else {
-                // Nếu là ngày trống, tạo sọc nhẹ cho các tháng chẵn để dễ nhìn form tách tháng
-                if ((day.getMonth() + 1) % 2 === 0) {
-                  bgClass = 'bg-gray-50/60';
+                if (checkoutDays < 0) {
+                  bgClass = 'bg-gray-300/60'; // Khách cũ đã out hiển thị sọc xám
+                } else if (checkoutDays <= 3) {
+                  bgClass = 'bg-red-400/90';  // Sắp checkout hiển thị đỏ cảnh báo
+                } else {
+                  bgClass = 'bg-blue-400/80';  // Đang ở bình thường màu xanh lam mát mắt
                 }
+              } else {
+                if ((day.getMonth() + 1) % 2 === 0) bgClass = 'bg-gray-50/50';
               }
 
-              // LỚP PHỦ HIGHLIGHT TODAY LÊN TRÊN: Nếu là ngày hôm nay, tạo div phủ màu vàng có độ trong suốt và z-index cao hơn
+              // Highlight cột hôm nay đè trực tiếp lên trước nhưng không chặn click chuột
               const todayOverlay = isToday(day) 
-                ? '<div class="absolute inset-0 bg-yellow-400/30 pointer-events-none z-10 border-x-2 border-yellow-500"></div>' 
+                ? '<div class="absolute inset-0 bg-yellow-400/25 pointer-events-none z-10 border-x border-yellow-400"></div>' 
                 : '';
 
               return `
-                <div class="border-r min-h-[80px] relative ${bgClass}">
+                <div class="border-r border-gray-100 min-h-[65px] relative ${bgClass}">
                   ${todayOverlay}
                 </div>
               `;
@@ -242,7 +265,7 @@
     }
 
     loadDashboard();
-    setInterval(loadDashboard, 60000);
+    setInterval(loadDashboard, 60000); // Tự động làm mới dữ liệu sau mỗi 1 phút
   </script>
 
 </body>
