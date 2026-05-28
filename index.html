@@ -131,9 +131,9 @@
 
       const dashboard = document.getElementById('dashboard');
 
-      // TĂNG SỐ NGÀY HIỂN THỊ: Từ -5 ngày trước đến 95 ngày sau (Tổng cộng ~100 ngày để cuộn mượt mà)
+      // TĂNG SỐ NGÀY HIỂN THỊ: Từ -5 ngày trước đến 30 ngày sau (Tổng cộng ~35 ngày để cuộn mượt mà)
       const days = [];
-      for (let i = -5; i < 95; i++) {
+      for (let i = -5; i < 30; i++) {
         const d = new Date();
         d.setDate(today.getDate() + i);
         days.push(d);
