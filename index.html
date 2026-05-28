@@ -8,7 +8,7 @@
   <style>
     /* Tối ưu thanh cuộn trên mobile mượt hơn */
     .custom-scrollbar::-webkit-scrollbar {
-      height: 6px;
+      height: 5px;
     }
     .custom-scrollbar::-webkit-scrollbar-thumb {
       background-color: #cbd5e1;
@@ -103,7 +103,6 @@
         const response = await fetch(API_URL);
         const data = await response.json();
         
-        // MỌ LỌC CHÍNH: Loại bỏ hoàn toàn khách out trước mốc timeline (-5 ngày)
         const residents = data
           .map(r => ({
             room: r.Room || '',
@@ -115,9 +114,9 @@
           }))
           .filter(r => {
             const depDate = parseDate(r.departure);
-            if (!depDate) return true; // Giữ lại nếu không có ngày out rõ ràng
+            if (!depDate) return true;
             depDate.setHours(0,0,0,0);
-            return depDate >= limitPastDate; // Chỉ giữ khách có ngày out từ 5 ngày trước trở lại đây
+            return depDate >= limitPastDate;
           });
 
         renderDashboard(residents);
@@ -132,7 +131,6 @@
     }
 
     function renderDashboard(residents) {
-      // Tính toán số phòng đang thực sự có khách ở (ngày hôm nay nằm trong kỳ lưu trú)
       const currentOccupiedRooms = new Set();
       residents.forEach(r => {
         if (isWithinStay(today, r.arrival, r.departure)) {
@@ -146,7 +144,6 @@
 
       const dashboard = document.getElementById('dashboard');
 
-      // THIẾT LẬP TIMELINE: Đúng 5 ngày trước và 30 ngày sau (Tổng cộng 35 ngày)
       const days = [];
       for (let i = -5; i <= 30; i++) {
         const d = new Date();
@@ -154,16 +151,16 @@
         days.push(d);
       }
 
-      // Độ rộng tối ưu mobile: Phòng 75px, Khách 220px, Mỗi ô ngày 38px
-      const gridStyle = `grid-template-columns: 75px 220px repeat(${days.length}, 38px); min-width: 1600px;`;
+      // ĐÃ SCALE: Phòng 50px, Khách dài 140px, Mỗi ô ngày 40px để hiển thị tối ưu trên mobile
+      const gridStyle = `grid-template-columns: 50px 140px repeat(${days.length}, 40px); min-width: 1450px;`;
 
       let html = '';
 
       // TẠO TIÊU ĐỀ LỊCH
       html += `
         <div class="grid sticky top-0 bg-white z-30 border-b select-none text-gray-700" style="${gridStyle}">
-          <div class="p-3 border-r font-bold bg-gray-50 sticky left-0 z-40 text-center text-sm">Phòng</div>
-          <div class="p-3 border-r font-bold bg-gray-50 sticky left-[75px] z-40 text-sm">Khách lưu trú</div>
+          <div class="p-3 border-r font-bold bg-gray-50 sticky left-0 z-40 text-center text-xs">P.</div>
+          <div class="p-3 border-r font-bold bg-gray-50 sticky left-[50px] z-40 text-xs">Khách lưu trú</div>
           ${days.map(day => {
             const dateNum = day.getDate();
             const monthNum = day.getMonth() + 1;
@@ -173,9 +170,9 @@
             if (isToday(day)) bgHeader = 'bg-yellow-300 font-bold text-black z-10';
 
             return `
-              <div class="text-center border-r py-1.5 flex flex-col justify-center text-xs border-gray-200/80 ${bgHeader}">
-                <div class="text-xs">${dateNum < 10 ? '0' + dateNum : dateNum}</div>
-                <div class="text-[9px] text-gray-400 font-normal">T${monthNum}</div>
+              <div class="text-center border-r py-1 flex flex-col justify-center text-xs border-gray-200/80 ${bgHeader}">
+                <div class="text-[11px] font-semibold">${dateNum < 10 ? '0' + dateNum : dateNum}</div>
+                <div class="text-[8px] text-gray-400 font-normal">T${monthNum}</div>
               </div>
             `;
           }).join('')}
@@ -189,37 +186,37 @@
         html += `
           <div class="grid border-b border-gray-100 hover:bg-gray-50/50 relative" style="${gridStyle}">
             
-            <div class="p-3 border-r font-semibold flex items-center justify-center sticky left-0 bg-white z-20 text-gray-800 text-sm shadow-[1px_0_3px_rgba(0,0,0,0.04)]">
+            <div class="p-2 border-r font-bold flex items-center justify-center sticky left-0 bg-white z-20 text-gray-800 text-xs shadow-[1px_0_3px_rgba(0,0,0,0.04)]">
               ${room}
             </div>
 
-            <div class="p-2 border-r space-y-1.5 sticky left-[75px] bg-white z-20 shadow-[2px_0_4px_rgba(0,0,0,0.03)] overflow-hidden">
+            <div class="p-1 border-r space-y-1 sticky left-[50px] bg-white z-20 shadow-[2px_0_4px_rgba(0,0,0,0.03)] overflow-hidden flex flex-col justify-center">
               ${roomResidents.length === 0
-                ? '<div class="text-green-600 font-medium text-xs p-1">Phòng trống</div>'
+                ? '<div class="text-green-600 font-medium text-[11px] px-1">Trống</div>'
                 : roomResidents.map(r => {
                     const checkoutDays = daysToCheckout(r.departure);
                     let badge = '';
                     
-                    // Logic tính toán Badge trạng thái hiển thị trực quan
                     if (checkoutDays < 0) {
-                      badge = '<span class="text-[10px] bg-gray-400 text-white px-1.5 py-0.5 rounded-md">Đã out</span>';
+                      badge = '<span class="text-[8px] bg-gray-400 text-white px-1 rounded">Out</span>';
                     } else if (checkoutDays <= 3) {
-                      badge = '<span class="text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded-md animate-pulse">Sắp out</span>';
-                    } 
-                  
+                      badge = '<span class="text-[8px] bg-red-500 text-white px-1 rounded animate-pulse">Sắp out</span>';
+                    } else {
+                      badge = '<span class="text-[8px] bg-blue-500 text-white px-1 rounded">Ở</span>';
+                    }
 
                     return `
-                      <details class="bg-slate-50/80 rounded-lg p-1.5 border border-slate-200/60 text-xs">
-                        <summary class="cursor-pointer text-blue-700 font-medium hover:underline flex items-center justify-between gap-1 outline-none">
-                          <span class="truncate block max-w-[110px] uppercase text-[11px]">${r.name}</span>
+                      <details class="bg-slate-50 rounded-md p-1 border border-slate-200/60 text-[10px]">
+                        <summary class="cursor-pointer text-blue-700 font-semibold hover:underline flex items-center justify-between gap-0.5 outline-none">
+                          <span class="truncate block max-w-[85px] uppercase text-[10px]">${r.name}</span>
                           ${badge}
                         </summary>
-                        <div class="mt-2 pt-1.5 border-t border-dashed border-gray-200 text-[11px] text-gray-600 space-y-1 select-text">
+                        <div class="mt-1.5 pt-1 border-t border-dashed border-gray-200 text-[10px] text-gray-600 space-y-0.5 select-text">
                           <div><b>PP:</b> ${r.passport}</div>
-                          <div><b>Quốc tịch:</b> ${r.nationality}</div>
+                          <div><b>QT:</b> ${r.nationality}</div>
                           <div><b>In:</b> ${r.arrival}</div>
                           <div><b>Out:</b> ${r.departure}</div>
-                          <div><b>Còn lại:</b> ${checkoutDays < 0 ? 'Đã hết hạn' : checkoutDays + ' ngày'}</div>
+                          <div><b>Còn:</b> ${checkoutDays < 0 ? 'Hết hạn' : checkoutDays + 'd'}</div>
                         </div>
                       </details>
                     `;
@@ -234,23 +231,22 @@
               if (residentInDay) {
                 const checkoutDays = daysToCheckout(residentInDay.departure);
                 if (checkoutDays < 0) {
-                  bgClass = 'bg-gray-300/60'; // Khách cũ đã out hiển thị sọc xám
+                  bgClass = 'bg-gray-300/60';
                 } else if (checkoutDays <= 3) {
-                  bgClass = 'bg-red-400/90';  // Sắp checkout hiển thị đỏ cảnh báo
+                  bgClass = 'bg-red-400/90';
                 } else {
-                  bgClass = 'bg-blue-400/80';  // Đang ở bình thường màu xanh lam mát mắt
+                  bgClass = 'bg-blue-400/80';
                 }
               } else {
                 if ((day.getMonth() + 1) % 2 === 0) bgClass = 'bg-gray-50/50';
               }
 
-              // Highlight cột hôm nay đè trực tiếp lên trước nhưng không chặn click chuột
               const todayOverlay = isToday(day) 
                 ? '<div class="absolute inset-0 bg-yellow-400/25 pointer-events-none z-10 border-x border-yellow-400"></div>' 
                 : '';
 
               return `
-                <div class="border-r border-gray-100 min-h-[65px] relative ${bgClass}">
+                <div class="border-r border-gray-100 min-h-[50px] relative ${bgClass}">
                   ${todayOverlay}
                 </div>
               `;
@@ -264,7 +260,7 @@
     }
 
     loadDashboard();
-    setInterval(loadDashboard, 60000); // Tự động làm mới dữ liệu sau mỗi 1 phút
+    setInterval(loadDashboard, 60000);
   </script>
 
 </body>
