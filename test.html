@@ -6,9 +6,9 @@
   <title>HOANG LE 1 - TEST MODE</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    /* Tối ưu thanh cuộn trên mobile mượt hơn */
+    /* Tối ưu thanh cuộn mượt hơn */
     .custom-scrollbar::-webkit-scrollbar {
-      height: 5px;
+      height: 6px;
     }
     .custom-scrollbar::-webkit-scrollbar-thumb {
       background-color: #cbd5e1;
@@ -18,11 +18,11 @@
 </head>
 <body class="bg-gray-100 p-3 sm:p-6 font-sans antialiased">
 
-  <div class="max-w-[1800px] mx-auto">
+  <div class="max-w-[100%] mx-auto shadow-sm">
     <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6">
       <div>
         <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">HOANG LE 1 (BẢN TEST)</h1>
-        <p class="text-purple-600 font-medium text-sm mt-1">Giao diện rút gọn thông tin - Gom tất cả vào Popup</p>
+        <p class="text-purple-600 font-medium text-sm mt-1">Giao diện tự động Scale thông minh theo kích thước màn hình</p>
       </div>
 
       <div class="grid grid-cols-3 gap-2 sm:gap-4 w-full lg:w-auto">
@@ -48,16 +48,11 @@
 
   <div id="actionModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl relative animate-[fadeIn_0.2s_ease-out]">
-      
       <h3 class="text-lg font-bold text-gray-900 uppercase border-b pb-2 mb-3 flex items-center justify-between" id="modalTitle">
         Thông tin khách
       </h3>
-      
-      <div class="bg-gray-50 rounded-xl p-3.5 text-xs text-gray-700 space-y-2 mb-4 border border-gray-200/60" id="modalResidentInfo">
-        </div>
-      
-      <div class="flex flex-col gap-2" id="modalButtons">
-        </div>
+      <div class="bg-gray-50 rounded-xl p-3.5 text-xs text-gray-700 space-y-2 mb-4 border border-gray-200/60" id="modalResidentInfo"></div>
+      <div class="flex flex-col gap-2" id="modalButtons"></div>
     </div>
   </div>
 
@@ -178,13 +173,14 @@
         days.push(d);
       }
 
-      const gridStyle = `grid-template-columns: 50px 140px repeat(${days.length}, 40px); min-width: 850px;`;
+      // AUTO SCALE ENGINE: Sử dụng minmax() để tự giãn 100% màn hình PC và giữ kích thước tối thiểu trên Mobile
+      const gridStyle = `grid-template-columns: 55px 160px repeat(${days.length}, minmax(40px, 1fr)); w-full;`;
       let html = '';
 
       html += `
         <div class="grid sticky top-0 bg-white z-30 border-b select-none text-gray-700" style="${gridStyle}">
           <div class="p-3 border-r font-bold bg-gray-50 sticky left-0 z-40 text-center text-xs">P.</div>
-          <div class="p-3 border-r font-bold bg-gray-50 sticky left-[50px] z-40 text-xs">Khách lưu trú</div>
+          <div class="p-3 border-r font-bold bg-gray-50 sticky left-[55px] z-40 text-xs">Khách lưu trú</div>
           ${days.map(day => {
             const dateNum = day.getDate();
             const monthNum = day.getMonth() + 1;
@@ -210,7 +206,7 @@
               ${room}
             </div>
 
-            <div class="p-1 border-r space-y-1 sticky left-[50px] bg-white z-20 shadow-[2px_0_4px_rgba(0,0,0,0.03)] overflow-hidden flex flex-col justify-center select-none">
+            <div class="p-1 border-r space-y-1 sticky left-[55px] bg-white z-20 shadow-[2px_0_4px_rgba(0,0,0,0.03)] overflow-hidden flex flex-col justify-center select-none">
               ${roomResidents.length === 0
                 ? '<div class="text-green-600 font-medium text-[11px] px-1">Trống</div>'
                 : roomResidents.map(r => {
@@ -218,19 +214,19 @@
                     let badge = '';
                     
                     if (r.isPending) {
-                      badge = `<span class="text-[8px] bg-purple-600 text-white px-1 rounded animate-pulse">${r.pendingType === 'extend' ? 'Gia hạn' : 'Trả phòng'}</span>`;
+                      badge = `<span class="text-[8px] bg-purple-600 text-white px-1 py-0.5 rounded shrink-0 whitespace-nowrap animate-pulse">${r.pendingType === 'extend' ? 'GH' : 'Out'}</span>`;
                     } else if (checkoutDays < 0) {
-                      badge = '<span class="text-[8px] bg-gray-400 text-white px-1 rounded">Out</span>';
+                      badge = '<span class="text-[8px] bg-gray-400 text-white px-1 py-0.5 rounded shrink-0 whitespace-nowrap">Out</span>';
                     } else if (checkoutDays <= 3) {
-                      badge = '<span class="text-[8px] bg-red-500 text-white px-1 rounded animate-pulse">Sắp out</span>';
+                      badge = '<span class="text-[8px] bg-red-500 text-white px-1 py-0.5 rounded shrink-0 whitespace-nowrap animate-pulse">Sắp out</span>';
                     } 
 
                     const resData = encodeURIComponent(JSON.stringify(r));
                     const nameBgClass = r.isPending ? 'bg-purple-50 border-purple-300 text-purple-700' : 'bg-blue-50 border-blue-200 text-blue-700';
 
                     return `
-                      <div onclick="openActionModal('${resData}')" class="cursor-pointer font-semibold flex items-center justify-between gap-1 p-1 rounded-md border ${nameBgClass} hover:opacity-80 transition duration-150">
-                        <span class="truncate block max-w-[85px] uppercase text-[10px]">
+                      <div onclick="openActionModal('${resData}')" class="cursor-pointer font-semibold flex items-center justify-between gap-1 p-1.5 rounded-md border ${nameBgClass} hover:opacity-80 transition duration-150">
+                        <span class="break-words uppercase text-[10px] leading-tight pr-1">
                           ${r.isPending ? '⏳' : '👤'} ${r.name}
                         </span>
                         ${badge}
@@ -262,7 +258,7 @@
               }
 
               const todayOverlay = isToday(day) ? '<div class="absolute inset-0 bg-yellow-400/25 pointer-events-none z-10 border-x border-yellow-400"></div>' : '';
-              return `<div class="border-r border-gray-100 min-h-[42px] relative ${bgClass}">${todayOverlay}</div>`;
+              return `<div class="border-r border-gray-100 min-h-[46px] relative ${bgClass}">${todayOverlay}</div>`;
             }).join('')}
           </div>
         `;
@@ -271,18 +267,15 @@
       dashboard.innerHTML = html;
     }
 
-    // HÀM HIỂN THỊ POPUP TỔNG HỢP CẢ THÔNG TIN LẪN NÚT BẤM
     function openActionModal(resDataStr) {
       selectedResident = JSON.parse(decodeURIComponent(resDataStr));
       const checkoutDays = daysToCheckout(selectedResident.departure);
       
-      // 1. Gán tiêu đề phòng và tên khách
       document.getElementById('modalTitle').innerHTML = `
         <span>Phòng ${selectedResident.room}</span>
         <span class="text-sm font-normal text-gray-500 lowercase">bản xem chi tiết</span>
       `;
       
-      // 2. Điền thông tin chi tiết khách hàng vào khung xám trong popup
       document.getElementById('modalResidentInfo').innerHTML = `
         <div class="flex justify-between border-b border-gray-200/60 pb-1 text-sm font-bold text-gray-900 uppercase">
           <span>👤 ${selectedResident.name}</span>
@@ -299,7 +292,6 @@
         </div>
       `;
       
-      // 3. Xử lý các nút bấm hành động tùy theo trạng thái
       const btnContainer = document.getElementById('modalButtons');
       if (!selectedResident.isPending) {
         btnContainer.innerHTML = `
@@ -334,7 +326,6 @@
       selectedResident = null;
     }
 
-    // Đóng popup khi click ra ngoài vùng trắng
     document.getElementById('actionModal').addEventListener('click', function(e) {
       if (e.target === this) closeModal();
     });
