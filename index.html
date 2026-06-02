@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HOANG LE 1</title>
+  <title>HOANG LE</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    /* Tối ưu thanh cuộn trên mobile mượt hơn */
+    /* Tối ưu thanh cuộn mượt hơn */
     .custom-scrollbar::-webkit-scrollbar {
-      height: 5px;
+      height: 6px;
     }
     .custom-scrollbar::-webkit-scrollbar-thumb {
       background-color: #cbd5e1;
@@ -18,24 +18,45 @@
 </head>
 <body class="bg-gray-100 p-3 sm:p-6 font-sans antialiased">
 
-  <div class="max-w-[1800px] mx-auto">
+  <div class="max-w-[100%] mx-auto shadow-sm">
     <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6">
-      <div>
-        <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">HOANG LE 1</h1>
-        <p class="text-gray-500 text-sm mt-1">Theo dõi tình trạng phòng và khách lưu trú</p>
-      </div>
+        <div class="flex items-center gap-3">
+  <div class="w-[240px] sm:w-[280px] h-auto drop-shadow-md">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 160" width="100%" height="100%">
+      <defs>
+        <filter id="subtle-shadow" x="-10%" y="-10%" width="120%" height="120%">
+          <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.15"/>
+        </filter>
+        <linearGradient id="gold-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#FFE259" />
+          <stop offset="100%" stop-color="#FFA751" />
+        </linearGradient>
+      </defs>
+      <rect width="500" height="160" rx="16" fill="#111827" />
+      <g transform="translate(15, 10)">
+        <path d="M 25 95 C 45 95, 55 85, 65 95 C 75 105, 45 110, 25 105 C 5 110, -25 105, -15 95 C -5 85, 5 95, 25 95 Z" fill="url(#gold-grad)" opacity="0.85"/>
+        <path d="M 25 102 C 35 102, 45 98, 55 105 C 35 108, 15 105, 25 102 Z" fill="#FFFFFF" opacity="0.9"/>
+        <text x="25" y="75" font-family="'Georgia', 'Times New Roman', serif" font-size="62" font-weight="bold" font-style="italic" text-anchor="middle" fill="url(#gold-grad)" filter="url(#subtle-shadow)">HL</text>
+      </g>
+      <g transform="translate(150, 0)">
+        <text x="0" y="82" font-family="'Impact', 'Arial Black', sans-serif" font-size="52" font-weight="900" fill="#EF4444" letter-spacing="3" filter="url(#subtle-shadow)">HOÀNG LÊ</text>
+        <text x="3" y="125" font-family="'Segoe UI', Arial, sans-serif" font-size="24" font-weight="800" fill="#FACC15" letter-spacing="7">APARTMENT</text>
+      </g>
+    </svg>
+  </div>
+  <span class="hidden sm:inline-block bg-purple-100 text-purple-700 text-xs font-bold px-2.5 py-1 rounded-full border border-purple-200">BẢN TEST</span>
+</div>
+      
 
       <div class="grid grid-cols-3 gap-2 sm:gap-4 w-full lg:w-auto">
         <div class="bg-white rounded-xl shadow p-3 text-center">
           <div class="text-xs sm:text-sm text-gray-400">Tổng phòng</div>
           <div id="totalRooms" class="text-lg sm:text-2xl font-bold text-gray-700"></div>
         </div>
-
         <div class="bg-white rounded-xl shadow p-3 text-center">
           <div class="text-xs sm:text-sm text-gray-400">Đang ở</div>
           <div id="occupiedRooms" class="text-lg sm:text-2xl font-bold text-blue-600"></div>
         </div>
-
         <div class="bg-white rounded-xl shadow p-3 text-center">
           <div class="text-xs sm:text-sm text-gray-400">Phòng trống</div>
           <div id="emptyRooms" class="text-lg sm:text-2xl font-bold text-green-600"></div>
@@ -48,10 +69,17 @@
     </div>
   </div>
 
+  <div id="actionModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl relative animate-[fadeIn_0.2s_ease-out]">
+      <h3 class="text-lg font-bold text-gray-900 uppercase border-b pb-2 mb-3 flex items-center justify-between" id="modalTitle">
+        Thông tin khách
+      </h3>
+      <div class="bg-gray-50 rounded-xl p-3.5 text-xs text-gray-700 space-y-2 mb-4 border border-gray-200/60" id="modalResidentInfo"></div>
+      <div class="flex flex-col gap-2" id="modalButtons"></div>
+    </div>
+  </div>
+
   <script>
-    // =========================
-    // GOOGLE SHEET CONFIG
-    // =========================
     const SHEET_ID = '1ImwCxw0HGk8bOEdJRQE_Iv5uBgbr1P79ONPVVJGcgzI';
     const SHEET_NAME = 'DATA';
     const API_URL = `https://opensheet.elk.sh/${SHEET_ID}/${SHEET_NAME}`;
@@ -60,10 +88,20 @@
     const today = new Date();
     today.setHours(0,0,0,0);
 
-    // Xác định mốc giới hạn lịch sử (-5 ngày)
     const limitPastDate = new Date();
     limitPastDate.setDate(today.getDate() - 5);
     limitPastDate.setHours(0,0,0,0);
+
+    let selectedResident = null;
+
+    function getPendingActions() {
+      const data = localStorage.getItem('hl1_pending_actions');
+      return data ? JSON.parse(data) : {};
+    }
+
+    function savePendingActions(actions) {
+      localStorage.setItem('hl1_pending_actions', JSON.stringify(actions));
+    }
 
     function formatDate(date) {
       return date.toISOString().split('T')[0];
@@ -75,7 +113,7 @@
 
     function parseDate(dateStr) {
       if (!dateStr) return null;
-      if (dateStr.includes('/')) {
+      if (typeof dateStr === 'string' && dateStr.includes('/')) {
         const parts = dateStr.split('/');
         return new Date(parts[2], parts[1] - 1, parts[0]);
       }
@@ -102,16 +140,27 @@
       try {
         const response = await fetch(API_URL);
         const data = await response.json();
-        
+        const pending = getPendingActions();
+
         const residents = data
-          .map(r => ({
-            room: r.Room || '',
-            name: r.Name || '',
-            nationality: r.Nationality || '',
-            passport: r.Passport || '',
-            arrival: r.Arrival || '',
-            departure: r.Departure || ''
-          }))
+          .map(r => {
+            let item = {
+              room: r.Room || '',
+              name: r.Name || '',
+              nationality: r.Nationality || '',
+              passport: r.Passport || '',
+              arrival: r.Arrival || '',
+              departure: r.Departure || ''
+            };
+
+            const key = `${item.room}_${item.passport}`;
+            if (pending[key]) {
+              item.departure = pending[key].newDeparture;
+              item.isPending = true;
+              item.pendingType = pending[key].type;
+            }
+            return item;
+          })
           .filter(r => {
             const depDate = parseDate(r.departure);
             if (!depDate) return true;
@@ -122,11 +171,7 @@
         renderDashboard(residents);
       } catch (error) {
         console.error(error);
-        document.getElementById('dashboard').innerHTML = `
-          <div class="p-10 text-center text-red-600 font-medium">
-            Không thể kết nối Google Sheet dữ liệu.
-          </div>
-        `;
+        document.getElementById('dashboard').innerHTML = `<div class="p-10 text-center text-red-600 font-medium">Không thể kết nối Google Sheet dữ liệu.</div>`;
       }
     }
 
@@ -145,30 +190,26 @@
       const dashboard = document.getElementById('dashboard');
 
       const days = [];
-      for (let i = -5; i <= 30; i++) {
+      for (let i = -5; i <= 15; i++) {
         const d = new Date();
         d.setDate(today.getDate() + i);
         days.push(d);
       }
 
-      // ĐÃ SCALE: Phòng 50px, Khách dài 140px, Mỗi ô ngày 40px để hiển thị tối ưu trên mobile
-      const gridStyle = `grid-template-columns: 50px 140px repeat(${days.length}, 40px); min-width: 1450px;`;
-
+      // AUTO SCALE ENGINE: Sử dụng minmax() để tự giãn 100% màn hình PC và giữ kích thước tối thiểu trên Mobile
+      const gridStyle = `grid-template-columns: 55px 160px repeat(${days.length}, minmax(40px, 1fr)); w-full;`;
       let html = '';
 
-      // TẠO TIÊU ĐỀ LỊCH
       html += `
         <div class="grid sticky top-0 bg-white z-30 border-b select-none text-gray-700" style="${gridStyle}">
           <div class="p-3 border-r font-bold bg-gray-50 sticky left-0 z-40 text-center text-xs">P.</div>
-          <div class="p-3 border-r font-bold bg-gray-50 sticky left-[50px] z-40 text-xs">Khách lưu trú</div>
+          <div class="p-3 border-r font-bold bg-gray-50 sticky left-[55px] z-40 text-xs">Khách lưu trú</div>
           ${days.map(day => {
             const dateNum = day.getDate();
             const monthNum = day.getMonth() + 1;
             const isContrastMonth = monthNum % 2 === 0;
-            
             let bgHeader = isContrastMonth ? 'bg-slate-100/70' : 'bg-white';
             if (isToday(day)) bgHeader = 'bg-yellow-300 font-bold text-black z-10';
-
             return `
               <div class="text-center border-r py-1 flex flex-col justify-center text-xs border-gray-200/80 ${bgHeader}">
                 <div class="text-[11px] font-semibold">${dateNum < 10 ? '0' + dateNum : dateNum}</div>
@@ -179,44 +220,40 @@
         </div>
       `;
 
-      // ĐỔ DỮ LIỆU TỪNG DÒNG PHÒNG
       roomList.forEach(room => {
         const roomResidents = residents.filter(r => r.room === room);
 
         html += `
           <div class="grid border-b border-gray-100 hover:bg-gray-50/50 relative" style="${gridStyle}">
-            
             <div class="p-2 border-r font-bold flex items-center justify-center sticky left-0 bg-white z-20 text-gray-800 text-xs shadow-[1px_0_3px_rgba(0,0,0,0.04)]">
               ${room}
             </div>
 
-            <div class="p-1 border-r space-y-1 sticky left-[50px] bg-white z-20 shadow-[2px_0_4px_rgba(0,0,0,0.03)] overflow-hidden flex flex-col justify-center">
+            <div class="p-1 border-r space-y-1 sticky left-[55px] bg-white z-20 shadow-[2px_0_4px_rgba(0,0,0,0.03)] overflow-hidden flex flex-col justify-center select-none">
               ${roomResidents.length === 0
                 ? '<div class="text-green-600 font-medium text-[11px] px-1">Trống</div>'
                 : roomResidents.map(r => {
                     const checkoutDays = daysToCheckout(r.departure);
                     let badge = '';
                     
-                    if (checkoutDays < 0) {
-                      badge = '<span class="text-[8px] bg-gray-400 text-white px-1 rounded">Out</span>';
+                    if (r.isPending) {
+                      badge = `<span class="text-[8px] bg-purple-600 text-white px-1 py-0.5 rounded shrink-0 whitespace-nowrap animate-pulse">${r.pendingType === 'extend' ? 'GH' : 'Out'}</span>`;
+                    } else if (checkoutDays < 0) {
+                      badge = '<span class="text-[8px] bg-gray-400 text-white px-1 py-0.5 rounded shrink-0 whitespace-nowrap">Out</span>';
                     } else if (checkoutDays <= 3) {
-                      badge = '<span class="text-[8px] bg-red-500 text-white px-1 rounded animate-pulse">Sắp out</span>';
+                      badge = '<span class="text-[8px] bg-red-500 text-white px-1 py-0.5 rounded shrink-0 whitespace-nowrap animate-pulse">Sắp out</span>';
                     } 
 
+                    const resData = encodeURIComponent(JSON.stringify(r));
+                    const nameBgClass = r.isPending ? 'bg-purple-50 border-purple-300 text-purple-700' : 'bg-blue-50 border-blue-200 text-blue-700';
+
                     return `
-                      <details class="bg-slate-50 rounded-md p-1 border border-slate-200/60 text-[10px]">
-                        <summary class="cursor-pointer text-blue-700 font-semibold hover:underline flex items-center justify-between gap-0.5 outline-none">
-                          <span class="truncate block max-w-[85px] uppercase text-[10px]">${r.name}</span>
-                          ${badge}
-                        </summary>
-                        <div class="mt-1.5 pt-1 border-t border-dashed border-gray-200 text-[10px] text-gray-600 space-y-0.5 select-text">
-                          <div><b>PP:</b> ${r.passport}</div>
-                          <div><b>QT:</b> ${r.nationality}</div>
-                          <div><b>In:</b> ${r.arrival}</div>
-                          <div><b>Out:</b> ${r.departure}</div>
-                          <div><b>Còn:</b> ${checkoutDays < 0 ? 'Hết hạn' : checkoutDays + 'd'}</div>
-                        </div>
-                      </details>
+                      <div onclick="openActionModal('${resData}')" class="cursor-pointer font-semibold flex items-center justify-between gap-1 p-1.5 rounded-md border ${nameBgClass} hover:opacity-80 transition duration-150">
+                        <span class="break-words uppercase text-[10px] leading-tight pr-1">
+                          ${r.isPending ? '⏳' : '👤'} ${r.name}
+                        </span>
+                        ${badge}
+                      </div>
                     `;
                 }).join('')
               }
@@ -227,29 +264,25 @@
 
               let bgClass = 'bg-white';
               if (residentInDay) {
-                const checkoutDays = daysToCheckout(residentInDay.departure);
-                if (checkoutDays < 0) {
-                  bgClass = 'bg-gray-300/60';
-                } else if (checkoutDays <= 3) {
-                  bgClass = 'bg-red-400/90';
+                if (residentInDay.isPending) {
+                  bgClass = 'bg-purple-400/70';
                 } else {
-                  bgClass = 'bg-blue-400/80';
+                  const checkoutDays = daysToCheckout(residentInDay.departure);
+                  if (checkoutDays < 0) {
+                    bgClass = 'bg-gray-300/60';
+                  } else if (checkoutDays <= 3) {
+                    bgClass = 'bg-red-400/90';
+                  } else {
+                    bgClass = 'bg-blue-400/80';
+                  }
                 }
               } else {
                 if ((day.getMonth() + 1) % 2 === 0) bgClass = 'bg-gray-50/50';
               }
 
-              const todayOverlay = isToday(day) 
-                ? '<div class="absolute inset-0 bg-yellow-400/25 pointer-events-none z-10 border-x border-yellow-400"></div>' 
-                : '';
-
-              return `
-                <div class="border-r border-gray-100 min-h-[50px] relative ${bgClass}">
-                  ${todayOverlay}
-                </div>
-              `;
+              const todayOverlay = isToday(day) ? '<div class="absolute inset-0 bg-yellow-400/25 pointer-events-none z-10 border-x border-yellow-400"></div>' : '';
+              return `<div class="border-r border-gray-100 min-h-[46px] relative ${bgClass}">${todayOverlay}</div>`;
             }).join('')}
-
           </div>
         `;
       });
@@ -257,9 +290,101 @@
       dashboard.innerHTML = html;
     }
 
+    function openActionModal(resDataStr) {
+      selectedResident = JSON.parse(decodeURIComponent(resDataStr));
+      const checkoutDays = daysToCheckout(selectedResident.departure);
+      
+      document.getElementById('modalTitle').innerHTML = `
+        <span>Phòng ${selectedResident.room}</span>
+        <span class="text-sm font-normal text-gray-500 lowercase">bản xem chi tiết</span>
+      `;
+      
+      document.getElementById('modalResidentInfo').innerHTML = `
+        <div class="flex justify-between border-b border-gray-200/60 pb-1 text-sm font-bold text-gray-900 uppercase">
+          <span>👤 ${selectedResident.name}</span>
+        </div>
+        <div class="grid grid-cols-2 gap-y-1.5 pt-1">
+          <div><b>Hộ chiếu (PP):</b></div> <div class="text-right select-all font-mono bg-white px-1 rounded border border-gray-100">${selectedResident.passport}</div>
+          <div><b>Quốc tịch:</b></div> <div class="text-right font-medium">${selectedResident.nationality}</div>
+          <div><b>Ngày đến (In):</b></div> <div class="text-right">${selectedResident.arrival}</div>
+          <div><b>Ngày đi (Out):</b></div> <div class="text-right font-medium text-blue-600">${selectedResident.departure} ${selectedResident.isPending ? '<span class="text-[10px] text-purple-600 font-bold">(Tạm)</span>' : ''}</div>
+          <div><b>Tình trạng:</b></div> 
+          <div class="text-right font-bold">
+            ${checkoutDays < 0 ? '<span class="text-gray-500">Hết hạn lưu trú</span>' : 'Còn lại ' + checkoutDays + ' ngày'}
+          </div>
+        </div>
+      `;
+      
+      const btnContainer = document.getElementById('modalButtons');
+      if (!selectedResident.isPending) {
+        btnContainer.innerHTML = `
+          <button onclick="setLocalAction('extend')" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2.5 px-4 rounded-xl text-sm transition shadow-sm flex items-center justify-center gap-1">
+            ➕ Đánh dấu: Gia hạn 1 tháng
+          </button>
+          <button onclick="setLocalAction('checkout')" class="w-full bg-red-50 hover:bg-red-100 text-red-600 font-medium py-2.5 px-4 rounded-xl text-sm transition flex items-center justify-center gap-1">
+            🔔 Đánh dấu: Trả phòng hôm nay
+          </button>
+          <button onclick="closeModal()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium py-2.5 px-4 rounded-xl text-sm transition mt-1">
+            Đóng cửa sổ
+          </button>
+        `;
+      } else {
+        btnContainer.innerHTML = `
+          <div class="p-3 bg-purple-50 text-purple-800 text-[11px] rounded-xl mb-1 border border-purple-200 leading-relaxed">
+            📌 Hệ thống ghi nhận bạn đã bấm đổi lịch tạm thời cho phòng này. Vui lòng vào file Excel/Google Sheet gốc sửa tay thông tin.
+          </div>
+          <button onclick="clearLocalAction()" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 px-4 rounded-xl text-sm transition shadow-sm flex items-center justify-center gap-1">
+            ✅ Đã update Google Sheet (Xóa màu tím)
+          </button>
+          <button onclick="closeModal()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium py-2.5 px-4 rounded-xl text-sm transition">
+            Đóng cửa sổ
+          </button>
+        `;
+      }
+      document.getElementById('actionModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('actionModal').classList.add('hidden');
+      selectedResident = null;
+    }
+
+    document.getElementById('actionModal').addEventListener('click', function(e) {
+      if (e.target === this) closeModal();
+    });
+
+    function setLocalAction(type) {
+      if (!selectedResident) return;
+      const pending = getPendingActions();
+      const key = `${selectedResident.room}_${selectedResident.passport}`;
+      let newDepStr = selectedResident.departure;
+      
+      if (type === 'extend') {
+        const currentDep = parseDate(selectedResident.departure) || new Date();
+        const baseDate = currentDep > today ? currentDep : new Date(today);
+        baseDate.setDate(baseDate.getDate() + 30);
+        const d = baseDate.getDate(); const m = baseDate.getMonth() + 1;
+        newDepStr = `${d < 10 ? '0'+d : d}/${m < 10 ? '0'+m : m}/${baseDate.getFullYear()}`;
+      } else if (type === 'checkout') {
+        const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+        const d = yesterday.getDate(); const m = yesterday.getMonth() + 1;
+        newDepStr = `${d < 10 ? '0'+d : d}/${m < 10 ? '0'+m : m}/${yesterday.getFullYear()}`;
+      }
+      
+      pending[key] = { type: type, newDeparture: newDepStr };
+      savePendingActions(pending); closeModal(); loadDashboard();
+    }
+
+    function clearLocalAction() {
+      if (!selectedResident) return;
+      const pending = getPendingActions();
+      const key = `${selectedResident.room}_${selectedResident.passport}`;
+      if (pending[key]) delete pending[key];
+      savePendingActions(pending); closeModal(); loadDashboard();
+    }
+
     loadDashboard();
     setInterval(loadDashboard, 60000);
   </script>
-
 </body>
 </html>
