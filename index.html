@@ -3,88 +3,128 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HOANG LE</title>
+  <title>HOANG LE - DASHBOARD</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    /* Tối ưu thanh cuộn mượt hơn */
-    .custom-scrollbar::-webkit-scrollbar {
-      height: 6px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb {
-      background-color: #cbd5e1;
-      border-radius: 3px;
-    }
+    .custom-scrollbar::-webkit-scrollbar { height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 3px; }
   </style>
 </head>
-<body class="bg-gray-100 p-3 sm:p-6 font-sans antialiased">
+<body class="bg-gray-100 p-3 sm:p-6 font-sans antialiased text-gray-800">
 
-  <div class="max-w-[100%] mx-auto shadow-sm">
+  <div class="max-w-[100%] mx-auto">
     <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6">
       <div>
-        <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">HOANG LE 1</h1>
+        <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">HOANG LE 1</h1>
+        <p class="text-xs text-gray-500 mt-1">Hệ thống quản lý trạng thái phòng Realtime</p>
       </div>
 
       <div class="grid grid-cols-3 gap-2 sm:gap-4 w-full lg:w-auto">
-        <div class="bg-white rounded-xl shadow p-3 text-center">
-          <div class="text-xs sm:text-sm text-gray-400">Tổng phòng</div>
-          <div id="totalRooms" class="text-lg sm:text-2xl font-bold text-gray-700"></div>
+        <div class="bg-white rounded-xl shadow-sm border p-3 text-center">
+          <div class="text-xs text-gray-400 font-medium">Tổng phòng</div>
+          <div id="totalRooms" class="text-lg sm:text-2xl font-bold text-gray-700">--</div>
         </div>
-        <div class="bg-white rounded-xl shadow p-3 text-center">
-          <div class="text-xs sm:text-sm text-gray-400">Đang ở</div>
-          <div id="occupiedRooms" class="text-lg sm:text-2xl font-bold text-blue-600"></div>
+        <div class="bg-white rounded-xl shadow-sm border p-3 text-center cursor-pointer hover:bg-blue-50 transition" onclick="setFilter('occupied')">
+          <div class="text-xs text-gray-400 font-medium">Đang ở</div>
+          <div id="occupiedRooms" class="text-lg sm:text-2xl font-bold text-blue-600">--</div>
         </div>
-        <div class="bg-white rounded-xl shadow p-3 text-center">
-          <div class="text-xs sm:text-sm text-gray-400">Phòng trống</div>
-          <div id="emptyRooms" class="text-lg sm:text-2xl font-bold text-green-600"></div>
+        <div class="bg-white rounded-xl shadow-sm border p-3 text-center cursor-pointer hover:bg-green-50 transition" onclick="setFilter('empty')">
+          <div class="text-xs text-gray-400 font-medium">Phòng trống</div>
+          <div id="emptyRooms" class="text-lg sm:text-2xl font-bold text-green-600">--</div>
         </div>
       </div>
     </div>
 
-    <div class="bg-white rounded-2xl shadow border overflow-hidden">
+    <div class="bg-white rounded-xl p-4 mb-4 shadow-sm border flex flex-col md:flex-row gap-3 items-center justify-between">
+      <div class="w-full md:w-72 relative">
+        <input type="text" id="searchInput" placeholder="Tìm tên khách / Hộ chiếu..." 
+               class="w-full pl-9 pr-4 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+               oninput="handleSearch()" />
+        <span class="absolute left-3 top-2.5 text-gray-400 text-sm">🔍</span>
+      </div>
+      
+      <div class="flex gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+        <button onclick="setFilter('all')" id="btnFilterAll" class="px-4 py-1.5 rounded-lg text-xs font-semibold bg-gray-900 text-white whitespace-nowrap">Tất cả</button>
+        <button onclick="setFilter('occupied')" id="btnFilterOccupied" class="px-4 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 border whitespace-nowrap hover:bg-gray-200">Đang ở</button>
+        <button onclick="setFilter('empty')" id="btnFilterEmpty" class="px-4 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 border whitespace-nowrap hover:bg-gray-200">Phòng trống</button>
+        <button onclick="setFilter('warning')" id="btnFilterWarning" class="px-4 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 border border-red-200 whitespace-nowrap hover:bg-red-100">Sắp hết hạn (≤7d)</button>
+      </div>
+    </div>
+
+    <div class="relative bg-white rounded-2xl shadow border overflow-hidden">
+      <div id="loadingOverlay" class="absolute inset-0 bg-white/70 z-50 flex flex-col items-center justify-center hidden animate-fade-in">
+        <div class="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-2"></div>
+        <div class="text-sm font-semibold text-gray-700" id="loadingText">Đang tải dữ liệu...</div>
+      </div>
       <div id="dashboard" class="overflow-x-auto custom-scrollbar"></div>
     </div>
   </div>
 
-  <div id="actionModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl relative animate-[fadeIn_0.2s_ease-out]">
-      <h3 class="text-lg font-bold text-gray-900 uppercase border-b pb-2 mb-3 flex items-center justify-between" id="modalTitle">
-        Thông tin khách
+  <div id="actionModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+    <div class="bg-white rounded-2xl p-5 max-w-sm w-full shadow-2xl relative border">
+      <h3 class="text-base font-bold text-gray-900 uppercase border-b pb-2 mb-3 flex items-center justify-between" id="modalTitle">
+        Thông tin phòng
       </h3>
-      <div class="bg-gray-50 rounded-xl p-3.5 text-xs text-gray-700 space-y-2 mb-4 border border-gray-200/60" id="modalResidentInfo"></div>
+      
+      <div class="mb-4">
+        <div class="flex justify-between text-[10px] text-gray-400 mb-1 font-medium">
+          <span id="progIn">--</span>
+          <span id="progPercent" class="font-bold text-blue-600">--</span>
+          <span id="progOut">--</span>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+          <div id="progBar" class="bg-blue-600 h-2 transition-all duration-500" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <div class="bg-gray-50 rounded-xl p-3 text-xs text-gray-700 space-y-2 mb-4 border" id="modalResidentInfo"></div>
+      
       <div class="flex flex-col gap-2" id="modalButtons"></div>
+      
+      <div id="extendOptions" class="hidden mt-3 pt-3 border-t space-y-2 animate-[fadeIn_0.15s_ease-out]">
+        <label class="text-xs font-bold text-purple-700 block">Chọn thời gian muốn gia hạn:</label>
+        <div class="grid grid-cols-3 gap-2">
+          <button onclick="submitExtend(1)" class="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-medium py-2 rounded-lg text-xs">1 Tháng</button>
+          <button onclick="submitExtend(2)" class="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-medium py-2 rounded-lg text-xs">2 Tháng</button>
+          <button onclick="submitExtend(3)" class="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-medium py-2 rounded-lg text-xs">3 Tháng</button>
+          <button onclick="submitExtend(6)" class="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-medium py-2 rounded-lg text-xs">6 Tháng</button>
+          <button onclick="submitExtend(12)" class="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-medium py-2 rounded-lg text-xs">1 Năm</button>
+          <button onclick="toggleExtendView(false)" class="bg-gray-100 hover:bg-gray-200 text-gray-600 py-2 rounded-lg text-xs">Quay lại</button>
+        </div>
+      </div>
     </div>
   </div>
 
   <script>
     const SHEET_ID = '1ImwCxw0HGk8bOEdJRQE_Iv5uBgbr1P79ONPVVJGcgzI';
     const SHEET_NAME = 'DATA';
-    const API_URL = `https://opensheet.elk.sh/${SHEET_ID}/${SHEET_NAME}`;
+    // API OpenSheet dùng để GET dữ liệu nhanh
+    const GET_URL = `https://opensheet.elk.sh/${SHEET_ID}/${SHEET_NAME}`;
+    // API Google Apps Script của bạn dùng để POST/Update dữ liệu ngược lên Sheet
+    const POST_URL = `https://script.google.com/macros/s/AKfycbyjZW4HaEYF-_GS3dvTKqaCBujRcSOdo2kpqg6c7Tt79cm_2uWZ2KFZvAI-8xNoPwJNrg/exec`;
 
     const roomList = ['301','302','401','402','501','502','601','602','701','702','801','802','901','902'];
-    const today = new Date();
-    today.setHours(0,0,0,0);
+    const today = new Date(); today.setHours(0,0,0,0);
+    
+    const limitPastDate = new Date(); limitPastDate.setDate(today.getDate() - 5); limitPastDate.setHours(0,0,0,0);
 
-    const limitPastDate = new Date();
-    limitPastDate.setDate(today.getDate() - 5);
-    limitPastDate.setHours(0,0,0,0);
-
+    let globalResidents = [];
+    let currentFilter = 'all'; // all, occupied, empty, warning
+    let searchQuery = '';
     let selectedResident = null;
 
-    function getPendingActions() {
-      const data = localStorage.getItem('hl1_pending_actions');
-      return data ? JSON.parse(data) : {};
+    function showLoading(text) {
+      document.getElementById('loadingText').innerText = text;
+      document.getElementById('loadingOverlay').classList.remove('hidden');
     }
-
-    function savePendingActions(actions) {
-      localStorage.setItem('hl1_pending_actions', JSON.stringify(actions));
+    function hideLoading() {
+      document.getElementById('loadingOverlay').classList.add('hidden');
     }
 
     function formatDate(date) {
-      return date.toISOString().split('T')[0];
-    }
-
-    function isToday(date) {
-      return formatDate(date) === formatDate(today);
+      if(!date) return '';
+      const d = date.getDate(); const m = date.getMonth() + 1;
+      return `${d < 10 ? '0'+d : d}/${m < 10 ? '0'+m : m}/${date.getFullYear()}`;
     }
 
     function parseDate(dateStr) {
@@ -97,9 +137,9 @@
     }
 
     function isWithinStay(day, arrival, departure) {
-      const d = new Date(formatDate(day));
-      const arrivalDate = parseDate(arrival);
-      const departureDate = parseDate(departure);
+      const d = new Date(day.getTime()); d.setHours(0,0,0,0);
+      const arrivalDate = parseDate(arrival); if(arrivalDate) arrivalDate.setHours(0,0,0,0);
+      const departureDate = parseDate(departure); if(departureDate) departureDate.setHours(0,0,0,0);
       if (!arrivalDate || !departureDate) return false;
       return d >= arrivalDate && d <= departureDate;
     }
@@ -113,121 +153,151 @@
     }
 
     async function loadDashboard() {
+      showLoading('Đang kéo dữ liệu trực tiếp...');
       try {
-        const response = await fetch(API_URL);
+        const response = await fetch(GET_URL);
         const data = await response.json();
-        const pending = getPendingActions();
 
-        const residents = data
-          .map(r => {
-            let item = {
-              room: r.Room || '',
-              name: r.Name || '',
-              nationality: r.Nationality || '',
-              passport: r.Passport || '',
-              arrival: r.Arrival || '',
-              departure: r.Departure || ''
-            };
+        globalResidents = data.map(r => ({
+          room: (r.Room || '').toString().trim(),
+          name: (r.Name || '').trim(),
+          nationality: (r.Nationality || '').trim(),
+          passport: (r.Passport || '').toString().trim(),
+          arrival: (r.Arrival || '').trim(),
+          departure: (r.Departure || '').trim(),
+          status: (r.Status || '').trim() // Trạng thái xử lý (Ví dụ: "đang gia hạn chờ duyệt")
+        })).filter(r => {
+          const depDate = parseDate(r.departure);
+          if (!depDate) return true;
+          depDate.setHours(0,0,0,0);
+          return depDate >= limitPastDate;
+        });
 
-            const key = `${item.room}_${item.passport}`;
-            if (pending[key]) {
-              item.departure = pending[key].newDeparture;
-              item.isPending = true;
-              item.pendingType = pending[key].type;
-            }
-            return item;
-          })
-          .filter(r => {
-            const depDate = parseDate(r.departure);
-            if (!depDate) return true;
-            depDate.setHours(0,0,0,0);
-            return depDate >= limitPastDate;
-          });
-
-        renderDashboard(residents);
+        renderDashboard();
       } catch (error) {
         console.error(error);
-        document.getElementById('dashboard').innerHTML = `<div class="p-10 text-center text-red-600 font-medium">Không thể kết nối Google Sheet dữ liệu.</div>`;
+        document.getElementById('dashboard').innerHTML = `<div class="p-10 text-center text-red-600 font-medium">Lỗi kết nối cơ sở dữ liệu Google Sheet.</div>`;
+      } finally {
+        hideLoading();
       }
     }
 
-    function renderDashboard(residents) {
-      const currentOccupiedRooms = new Set();
-      residents.forEach(r => {
-        if (isWithinStay(today, r.arrival, r.departure)) {
-          currentOccupiedRooms.add(r.room);
+    function setFilter(filterType) {
+      currentFilter = filterType;
+      // Cập nhật giao diện nút bấm filter
+      ['All', 'Occupied', 'Empty', 'Warning'].forEach(type => {
+        const btn = document.getElementById(`btnFilter${type}`);
+        if(type.toLowerCase() === filterType) {
+          btn.className = "px-4 py-1.5 rounded-lg text-xs font-semibold bg-gray-900 text-white whitespace-nowrap";
+        } else {
+          btn.className = "px-4 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 border whitespace-nowrap hover:bg-gray-200";
         }
+      });
+      renderDashboard();
+    }
+
+    function handleSearch() {
+      searchQuery = document.getElementById('searchInput').value.toLowerCase().trim();
+      renderDashboard();
+    }
+
+    function renderDashboard() {
+      // 1. Tính toán Thống kê tổng quan dựa trên dữ liệu thật
+      const occupiedSet = new Set();
+      globalResidents.forEach(r => {
+        if (isWithinStay(today, r.arrival, r.departure)) occupiedSet.add(r.room);
       });
 
       document.getElementById('totalRooms').innerText = roomList.length;
-      document.getElementById('occupiedRooms').innerText = currentOccupiedRooms.size;
-      document.getElementById('emptyRooms').innerText = roomList.length - currentOccupiedRooms.size;
+      document.getElementById('occupiedRooms').innerText = occupiedSet.size;
+      document.getElementById('emptyRooms').innerText = roomList.length - occupiedSet.size;
 
-      const dashboard = document.getElementById('dashboard');
-
+      // 2. Thiết lập dải ngày hiển thị (Trục ngang: từ -5 ngày đến +15 ngày)
       const days = [];
       for (let i = -5; i <= 15; i++) {
-        const d = new Date();
-        d.setDate(today.getDate() + i);
+        const d = new Date(); d.setDate(today.getDate() + i);
         days.push(d);
       }
 
-      // AUTO SCALE ENGINE: Sử dụng minmax() để tự giãn 100% màn hình PC và giữ kích thước tối thiểu trên Mobile
-      const gridStyle = `grid-template-columns: 55px 160px repeat(${days.length}, minmax(40px, 1fr)); w-full;`;
+      const gridStyle = `grid-template-columns: 55px 165px repeat(${days.length}, minmax(42px, 1fr)); w-full;`;
       let html = '';
 
+      // Khởi tạo hàng tiêu đề ngày tháng
       html += `
         <div class="grid sticky top-0 bg-white z-30 border-b select-none text-gray-700" style="${gridStyle}">
-          <div class="p-3 border-r font-bold bg-gray-50 sticky left-0 z-40 text-center text-xs">P.</div>
-          <div class="p-3 border-r font-bold bg-gray-50 sticky left-[55px] z-40 text-xs">Khách lưu trú</div>
+          <div class="p-3 border-r font-bold bg-gray-50 sticky left-0 z-40 text-center text-xs shadow-[1px_0_0_#e2e8f0]">P.</div>
+          <div class="p-3 border-r font-bold bg-gray-50 sticky left-[55px] z-40 text-xs shadow-[1px_0_0_#e2e8f0]">Khách lưu trú</div>
           ${days.map(day => {
-            const dateNum = day.getDate();
-            const monthNum = day.getMonth() + 1;
-            const isContrastMonth = monthNum % 2 === 0;
-            let bgHeader = isContrastMonth ? 'bg-slate-100/70' : 'bg-white';
-            if (isToday(day)) bgHeader = 'bg-yellow-300 font-bold text-black z-10';
+            const dateNum = day.getDate(); const monthNum = day.getMonth() + 1;
+            let bgHeader = (monthNum % 2 === 0) ? 'bg-slate-50' : 'bg-white';
+            if (day.toDateString() === today.toDateString()) bgHeader = 'bg-yellow-300 font-bold text-black z-10';
             return `
-              <div class="text-center border-r py-1 flex flex-col justify-center text-xs border-gray-200/80 ${bgHeader}">
+              <div class="text-center border-r py-1 flex flex-col justify-center text-xs border-gray-200/60 ${bgHeader}">
                 <div class="text-[11px] font-semibold">${dateNum < 10 ? '0' + dateNum : dateNum}</div>
-                <div class="text-[8px] text-gray-400 font-normal">T${monthNum}</div>
+                <div class="text-[8px] text-gray-400">T${monthNum}</div>
               </div>
             `;
           }).join('')}
         </div>
       `;
 
+      // 3. Duyệt danh sách phòng và lọc hiển thị
       roomList.forEach(room => {
-        const roomResidents = residents.filter(r => r.room === room);
+        let roomResidents = globalResidents.filter(r => r.room === room);
+        const isOccupied = roomResidents.some(r => isWithinStay(today, r.arrival, r.departure));
+
+        // Thực thi bộ lọc cấp phòng
+        if (currentFilter === 'occupied' && !isOccupied) return;
+        if (currentFilter === 'empty' && isOccupied) return;
+        if (currentFilter === 'warning') {
+          roomResidents = roomResidents.filter(r => {
+            const daysLeft = daysToCheckout(r.departure);
+            return daysLeft !== null && daysLeft >= 0 && daysLeft <= 7;
+          });
+          if (roomResidents.length === 0 && !isOccupied) return;
+        }
+
+        // Thực thi tìm kiếm chuỗi text (Tên hoặc Hộ chiếu)
+        if (searchQuery !== '') {
+          const match = roomResidents.some(r => r.name.toLowerCase().includes(searchQuery) || r.passport.toLowerCase().includes(searchQuery));
+          if (!match) return;
+        }
 
         html += `
-          <div class="grid border-b border-gray-100 hover:bg-gray-50/50 relative" style="${gridStyle}">
-            <div class="p-2 border-r font-bold flex items-center justify-center sticky left-0 bg-white z-20 text-gray-800 text-xs shadow-[1px_0_3px_rgba(0,0,0,0.04)]">
+          <div class="grid border-b border-gray-100 hover:bg-gray-50/40 relative min-h-[48px]" style="${gridStyle}">
+            <div class="p-2 border-r font-bold flex items-center justify-center sticky left-0 bg-white z-20 text-gray-800 text-xs shadow-[2px_0_3px_-1px_rgba(0,0,0,0.08)]">
               ${room}
             </div>
 
-            <div class="p-1 border-r space-y-1 sticky left-[55px] bg-white z-20 shadow-[2px_0_4px_rgba(0,0,0,0.03)] overflow-hidden flex flex-col justify-center select-none">
+            <div class="p-1 border-r space-y-1 sticky left-[55px] bg-white z-20 shadow-[3px_0_4px_-1px_rgba(0,0,0,0.06)] overflow-hidden flex flex-col justify-center select-none">
               ${roomResidents.length === 0
-                ? '<div class="text-green-600 font-medium text-[11px] px-1">Trống</div>'
+                ? '<div class="text-green-600 font-semibold text-[11px] px-1.5 py-1 bg-green-50/50 rounded-md border border-dashed border-green-200 text-center">Trống</div>'
                 : roomResidents.map(r => {
-                    const checkoutDays = daysToCheckout(r.departure);
+                    const daysLeft = daysToCheckout(r.departure);
                     let badge = '';
-                    
-                    if (r.isPending) {
-                      badge = `<span class="text-[8px] bg-purple-600 text-white px-1 py-0.5 rounded shrink-0 whitespace-nowrap animate-pulse">${r.pendingType === 'extend' ? 'GH' : 'Out'}</span>`;
-                    } else if (checkoutDays < 0) {
-                      badge = '<span class="text-[8px] bg-gray-400 text-white px-1 py-0.5 rounded shrink-0 whitespace-nowrap">Out</span>';
-                    } else if (checkoutDays <= 3) {
-                      badge = '<span class="text-[8px] bg-red-500 text-white px-1 py-0.5 rounded shrink-0 whitespace-nowrap animate-pulse">Sắp out</span>';
-                    } 
+                    let nameBgClass = 'bg-blue-50 border-blue-200 text-blue-700';
+
+                    // Cấu hình mã màu cảnh báo trạng thái
+                    if (r.status.toLowerCase().includes('tím') || r.status.toLowerCase().includes('gia hạn')) {
+                      badge = '<span class="text-[8px] bg-purple-600 text-white px-1 py-0.5 rounded shrink-0">Chờ duyệt</span>';
+                      nameBgClass = 'bg-purple-50 border-purple-200 text-purple-700 animate-pulse';
+                    } else if (daysLeft !== null) {
+                      if (daysLeft < 0) {
+                        badge = '<span class="text-[8px] bg-gray-400 text-white px-1 py-0.5 rounded shrink-0">Hết hạn</span>';
+                        nameBgClass = 'bg-gray-100 border-gray-300 text-gray-500';
+                      } else if (daysLeft <= 3) {
+                        badge = `<span class="text-[8px] bg-red-600 text-white px-1 py-0.5 rounded shrink-0 font-bold">${daysLeft}d</span>`;
+                        nameBgClass = 'bg-red-50 border-red-200 text-red-700 font-bold';
+                      } else if (daysLeft <= 7) {
+                        badge = `<span class="text-[8px] bg-amber-500 text-white px-1 py-0.5 rounded shrink-0">${daysLeft}d</span>`;
+                        nameBgClass = 'bg-amber-50 border-amber-200 text-amber-800';
+                      }
+                    }
 
                     const resData = encodeURIComponent(JSON.stringify(r));
-                    const nameBgClass = r.isPending ? 'bg-purple-50 border-purple-300 text-purple-700' : 'bg-blue-50 border-blue-200 text-blue-700';
-
                     return `
-                      <div onclick="openActionModal('${resData}')" class="cursor-pointer font-semibold flex items-center justify-between gap-1 p-1.5 rounded-md border ${nameBgClass} hover:opacity-80 transition duration-150">
-                        <span class="break-words uppercase text-[10px] leading-tight pr-1">
-                          ${r.isPending ? '⏳' : '👤'} ${r.name}
-                        </span>
+                      <div onclick="openActionModal('${resData}')" class="cursor-pointer font-medium flex items-center justify-between gap-1 p-1.5 rounded-lg border text-[11px] leading-tight transition active:scale-98 shadow-xs ${nameBgClass}">
+                        <span class="truncate uppercase max-w-[100px]">👤 ${r.name}</span>
                         ${badge}
                       </div>
                     `;
@@ -237,27 +307,25 @@
 
             ${days.map(day => {
               const residentInDay = roomResidents.find(r => isWithinStay(day, r.arrival, r.departure));
-
               let bgClass = 'bg-white';
+
               if (residentInDay) {
-                if (residentInDay.isPending) {
-                  bgClass = 'bg-purple-400/70';
-                } else {
-                  const checkoutDays = daysToCheckout(residentInDay.departure);
-                  if (checkoutDays < 0) {
-                    bgClass = 'bg-gray-300/60';
-                  } else if (checkoutDays <= 3) {
-                    bgClass = 'bg-red-400/90';
-                  } else {
-                    bgClass = 'bg-blue-400/80';
-                  }
+                const daysLeft = daysToCheckout(residentInDay.departure);
+                if (residentInDay.status.toLowerCase().includes('tím') || residentInDay.status.toLowerCase().includes('gia hạn')) {
+                  bgClass = 'bg-purple-400/80';
+                } else if (daysLeft !== null) {
+                  if (daysLeft < 0) bgClass = 'bg-gray-300/60';
+                  else if (daysLeft <= 3) bgClass = 'bg-red-400/90';
+                  else if (daysLeft <= 7) bgClass = 'bg-amber-400/80';
+                  else bgClass = 'bg-blue-400/80';
                 }
               } else {
-                if ((day.getMonth() + 1) % 2 === 0) bgClass = 'bg-gray-50/50';
+                if ((day.getMonth() + 1) % 2 === 0) bgClass = 'bg-gray-50/60';
               }
 
-              const todayOverlay = isToday(day) ? '<div class="absolute inset-0 bg-yellow-400/25 pointer-events-none z-10 border-x border-yellow-400"></div>' : '';
-              return `<div class="border-r border-gray-100 min-h-[46px] relative ${bgClass}">${todayOverlay}</div>`;
+              const isDayToday = (day.toDateString() === today.toDateString());
+              const todayOverlay = isDayToday ? '<div class="absolute inset-0 bg-yellow-400/20 pointer-events-none border-x-2 border-yellow-400/60"></div>' : '';
+              return `<div class="border-r border-gray-100 min-h-[46px] relative transition-colors ${bgClass}">${todayOverlay}</div>`;
             }).join('')}
           </div>
         `;
@@ -268,56 +336,78 @@
 
     function openActionModal(resDataStr) {
       selectedResident = JSON.parse(decodeURIComponent(resDataStr));
-      const checkoutDays = daysToCheckout(selectedResident.departure);
+      const daysLeft = daysToCheckout(selectedResident.departure);
       
       document.getElementById('modalTitle').innerHTML = `
         <span>Phòng ${selectedResident.room}</span>
-        <span class="text-sm font-normal text-gray-500 lowercase">bản xem chi tiết</span>
+        <span class="text-xs font-normal text-gray-500 capitalize">Thao tác nhanh</span>
       `;
-      
+
+      // 1. Tính toán Progress Bar Tiến độ lưu trú
+      const inDate = parseDate(selectedResident.arrival);
+      const outDate = parseDate(selectedResident.departure);
+      let pctStr = '0%';
+      if(inDate && outDate) {
+        const totalStay = outDate - inDate;
+        const elapsed = today - inDate;
+        if(totalStay > 0) {
+          let pct = Math.round((elapsed / totalStay) * 100);
+          pct = Math.max(0, Math.min(100, pct)); // Giới hạn từ 0% -> 100%
+          pctStr = pct + '%';
+        }
+      }
+      document.getElementById('progIn').innerText = selectedResident.arrival;
+      document.getElementById('progOut').innerText = selectedResident.departure;
+      document.getElementById('progPercent').innerText = pctStr;
+      document.getElementById('progBar').style.width = pctStr;
+
+      // 2. Hiển thị thông tin text khách hàng
+      let alertStatusText = '';
+      if (selectedResident.status.toLowerCase().includes('tím') || selectedResident.status.toLowerCase().includes('gia hạn')) {
+        alertStatusText = '<span class="text-purple-600 font-bold">💜 Đang gia hạn chờ duyệt</span>';
+      } else if (daysLeft !== null) {
+        if (daysLeft < 0) alertStatusText = '<span class="text-gray-500 font-bold">Hết hạn hợp đồng</span>';
+        else if (daysLeft <= 3) alertStatusText = `<span class="text-red-600 font-bold">🔴 Nguy cấp! Còn ${daysLeft} ngày</span>`;
+        else if (daysLeft <= 7) alertStatusText = `<span class="text-amber-500 font-bold">🟡 Cảnh báo! Còn ${daysLeft} ngày</span>`;
+        else alertStatusText = `<span class="text-green-600 font-bold">🟢 Bình thường (Còn ${daysLeft} ngày)</span>`;
+      }
+
       document.getElementById('modalResidentInfo').innerHTML = `
-        <div class="flex justify-between border-b border-gray-200/60 pb-1 text-sm font-bold text-gray-900 uppercase">
+        <div class="flex justify-between border-b pb-1 mb-1 text-sm font-bold text-gray-900">
           <span>👤 ${selectedResident.name}</span>
         </div>
-        <div class="grid grid-cols-2 gap-y-1.5 pt-1">
-          <div><b>Hộ chiếu (PP):</b></div> <div class="text-right select-all font-mono bg-white px-1 rounded border border-gray-100">${selectedResident.passport}</div>
-          <div><b>Quốc tịch:</b></div> <div class="text-right font-medium">${selectedResident.nationality}</div>
-          <div><b>Ngày đến (In):</b></div> <div class="text-right">${selectedResident.arrival}</div>
-          <div><b>Ngày đi (Out):</b></div> <div class="text-right font-medium text-blue-600">${selectedResident.departure} ${selectedResident.isPending ? '<span class="text-[10px] text-purple-600 font-bold">(Tạm)</span>' : ''}</div>
-          <div><b>Tình trạng:</b></div> 
-          <div class="text-right font-bold">
-            ${checkoutDays < 0 ? '<span class="text-gray-500">Hết hạn lưu trú</span>' : 'Còn lại ' + checkoutDays + ' ngày'}
-          </div>
+        <div class="grid grid-cols-2 gap-y-1">
+          <div><b>Hộ chiếu:</b></div> <div class="text-right select-all font-mono bg-white px-1 border rounded">${selectedResident.passport}</div>
+          <div><b>Quốc tịch:</b></div> <div class="text-right">${selectedResident.nationality}</div>
+          <div><b>Tình trạng:</b></div> <div class="text-right">${alertStatusText}</div>
         </div>
       `;
       
+      toggleExtendView(false); // Trở về giao diện nút mặc định ban đầu
+      document.getElementById('actionModal').classList.remove('hidden');
+    }
+
+    function toggleExtendView(showExtend) {
       const btnContainer = document.getElementById('modalButtons');
-      if (!selectedResident.isPending) {
+      const extendOptions = document.getElementById('extendOptions');
+
+      if (!showExtend) {
+        extendOptions.classList.add('hidden');
         btnContainer.innerHTML = `
-          <button onclick="setLocalAction('extend')" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2.5 px-4 rounded-xl text-sm transition shadow-sm flex items-center justify-center gap-1">
-            ➕ Đánh dấu: Gia hạn 1 tháng
+          <button onclick="toggleExtendView(true)" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 px-4 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1">
+            ➕ Yêu cầu gia hạn hợp đồng
           </button>
-          <button onclick="setLocalAction('checkout')" class="w-full bg-red-50 hover:bg-red-100 text-red-600 font-medium py-2.5 px-4 rounded-xl text-sm transition flex items-center justify-center gap-1">
-            🔔 Đánh dấu: Trả phòng hôm nay
+          <button onclick="submitCheckout()" class="w-full bg-red-50 hover:bg-red-100 text-red-600 font-semibold py-2.5 px-4 rounded-xl text-xs transition border border-red-200 flex items-center justify-center gap-1">
+            🔔 Xác nhận Trả phòng Hôm nay
           </button>
-          <button onclick="closeModal()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium py-2.5 px-4 rounded-xl text-sm transition mt-1">
+          <button onclick="closeModal()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium py-2 px-4 rounded-xl text-xs transition mt-1">
             Đóng cửa sổ
           </button>
         `;
       } else {
-        btnContainer.innerHTML = `
-          <div class="p-3 bg-purple-50 text-purple-800 text-[11px] rounded-xl mb-1 border border-purple-200 leading-relaxed">
-            📌 Hệ thống ghi nhận bạn đã bấm đổi lịch tạm thời cho phòng này. Vui lòng vào file Excel/Google Sheet gốc sửa tay thông tin.
-          </div>
-          <button onclick="clearLocalAction()" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 px-4 rounded-xl text-sm transition shadow-sm flex items-center justify-center gap-1">
-            ✅ Đã update Google Sheet (Xóa màu tím)
-          </button>
-          <button onclick="closeModal()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium py-2.5 px-4 rounded-xl text-sm transition">
-            Đóng cửa sổ
-          </button>
-        `;
+        btnContainer.innerHTML = '';
+        extendOptions.classList.remove('hidden');
       }
-      document.getElementById('actionModal').classList.remove('hidden');
     }
 
     function closeModal() {
@@ -329,36 +419,76 @@
       if (e.target === this) closeModal();
     });
 
-    function setLocalAction(type) {
+    // HÀM CHỨC NĂNG REALTIME: TRẢ PHÒNG NGAY HÔM NAY
+    async function submitCheckout() {
       if (!selectedResident) return;
-      const pending = getPendingActions();
-      const key = `${selectedResident.room}_${selectedResident.passport}`;
-      let newDepStr = selectedResident.departure;
-      
-      if (type === 'extend') {
-        const currentDep = parseDate(selectedResident.departure) || new Date();
-        const baseDate = currentDep > today ? currentDep : new Date(today);
-        baseDate.setDate(baseDate.getDate() + 30);
-        const d = baseDate.getDate(); const m = baseDate.getMonth() + 1;
-        newDepStr = `${d < 10 ? '0'+d : d}/${m < 10 ? '0'+m : m}/${baseDate.getFullYear()}`;
-      } else if (type === 'checkout') {
-        const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
-        const d = yesterday.getDate(); const m = yesterday.getMonth() + 1;
-        newDepStr = `${d < 10 ? '0'+d : d}/${m < 10 ? '0'+m : m}/${yesterday.getFullYear()}`;
+      if (!confirm(`Bạn có chắc chắn muốn trả phòng cho khách: ${selectedResident.name} ngay hôm nay?`)) return;
+
+      closeModal();
+      showLoading('Đang xử lý trả phòng trên Google Sheet...');
+
+      const payload = {
+        action: 'checkout',
+        room: selectedResident.room,
+        passport: selectedResident.passport,
+        todayStr: formatDate(today) // Định dạng dd/mm/yyyy đẩy về Script
+      };
+
+      try {
+        // Thực hiện gửi request POST trực tiếp lên Apps Script để sửa dữ liệu
+        const res = await fetch(POST_URL, {
+          method: 'POST',
+          mode: 'no-cors', // Sử dụng no-cors nếu Apps Script không bật CORS, hệ thống Google vẫn ghi nhận lệnh
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        // Đợi 2.5 giây tối ưu cho luồng dữ liệu Google Drive đồng bộ, sau đó tải lại dashboard
+        setTimeout(async () => {
+          await loadDashboard();
+        }, 2500);
+
+      } catch (error) {
+        console.error(error);
+        alert('Có lỗi xảy ra khi đồng bộ Google Sheet.');
+        hideLoading();
       }
-      
-      pending[key] = { type: type, newDeparture: newDepStr };
-      savePendingActions(pending); closeModal(); loadDashboard();
     }
 
-    function clearLocalAction() {
+    // HÀM CHỨC NĂNG REALTIME: GIA HẠN HỢP ĐỒNG CHỜ DUYỆT (ĐỔI MÀU TÍM)
+    async function submitExtend(months) {
       if (!selectedResident) return;
-      const pending = getPendingActions();
-      const key = `${selectedResident.room}_${selectedResident.passport}`;
-      if (pending[key]) delete pending[key];
-      savePendingActions(pending); closeModal(); loadDashboard();
+      
+      closeModal();
+      showLoading(`Đang đăng ký gia hạn ${months} tháng...`);
+
+      const payload = {
+        action: 'extend',
+        room: selectedResident.room,
+        passport: selectedResident.passport,
+        months: months
+      };
+
+      try {
+        await fetch(POST_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        setTimeout(async () => {
+          await loadDashboard();
+        }, 2500);
+
+      } catch (error) {
+        console.error(error);
+        alert('Có lỗi xảy ra khi đồng bộ yêu cầu gia hạn.');
+        hideLoading();
+      }
     }
 
+    // Khởi chạy hệ thống tự động tải và lập lịch làm mới mỗi 60 giây
     loadDashboard();
     setInterval(loadDashboard, 60000);
   </script>
