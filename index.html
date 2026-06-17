@@ -101,7 +101,7 @@
     // API OpenSheet dùng để GET dữ liệu nhanh
     const GET_URL = `https://opensheet.elk.sh/${SHEET_ID}/${SHEET_NAME}`;
     // API Google Apps Script của bạn dùng để POST/Update dữ liệu ngược lên Sheet
-    const POST_URL = `https://script.google.com/macros/s/AKfycbwpeL2FWLRC3ow5p7FY1Pl5nASfWqMX-77pno_JeT3J669Kd91cXUyk-pmwXNuyU0cdpw/exec`;
+    const POST_URL = `https://script.google.com/macros/s/AKfycbx6Ej9cGAzTAXpDQs-4zcVEMZErZS7AbZ631AzJ5jPlOnH9bTMFk2-ouhyu7mNvqZCb/exec`;
 
     const roomList = ['301','302','401','402','501','502','601','602','701','702','801','802','901','902'];
     const today = new Date(); today.setHours(0,0,0,0);
@@ -251,7 +251,7 @@
         if (currentFilter === 'empty' && isOccupied) return;
         if (currentFilter === 'warning') {
           roomResidents = roomResidents.filter(r => {
-            const daysLeft = daysToCheckout(r.departure);
+            const daysLeft = daysToout(r.departure);
             return daysLeft !== null && daysLeft >= 0 && daysLeft <= 7;
           });
           if (roomResidents.length === 0 && !isOccupied) return;
@@ -273,7 +273,7 @@
               ${roomResidents.length === 0
                 ? '<div class="text-green-600 font-semibold text-[11px] px-1.5 py-1 bg-green-50/50 rounded-md border border-dashed border-green-200 text-center">Trống</div>'
                 : roomResidents.map(r => {
-                    const daysLeft = daysToCheckout(r.departure);
+                    const daysLeft = daysToout(r.departure);
                     let badge = '';
                     let nameBgClass = 'bg-blue-50 border-blue-200 text-blue-700';
 
@@ -310,7 +310,7 @@
               let bgClass = 'bg-white';
 
               if (residentInDay) {
-                const daysLeft = daysToCheckout(residentInDay.departure);
+                const daysLeft = daysToout(residentInDay.departure);
                 if (residentInDay.status.toLowerCase().includes('tím') || residentInDay.status.toLowerCase().includes('gia hạn')) {
                   bgClass = 'bg-purple-400/80';
                 } else if (daysLeft !== null) {
@@ -336,7 +336,7 @@
 
     function openActionModal(resDataStr) {
       selectedResident = JSON.parse(decodeURIComponent(resDataStr));
-      const daysLeft = daysToCheckout(selectedResident.departure);
+      const daysLeft = daysToout(selectedResident.departure);
       
       document.getElementById('modalTitle').innerHTML = `
         <span>Phòng ${selectedResident.room}</span>
@@ -420,73 +420,56 @@
     });
 
     // HÀM CHỨC NĂNG REALTIME: TRẢ PHÒNG NGAY HÔM NAY
-    async function submitCheckout() {
-      if (!selectedResident) return;
-      if (!confirm(`Bạn có chắc chắn muốn trả phòng cho khách: ${selectedResident.name} ngay hôm nay?`)) return;
+    
+// HÀM CHỨC NĂNG REALTIME: TRẢ PHÒNG (GỌI QUA GET)
+async function submitCheckout() {
+  if (!selectedResident) return;
+  if (!confirm(`Bạn có chắc chắn muốn trả phòng cho khách: ${selectedResident.name} ngay hôm nay?`)) return;
 
-      closeModal();
-      showLoading('Đang xử lý trả phòng trên Google Sheet...');
+  closeModal();
+  showLoading('Đang xử lý trả phòng trên Google Sheet...');
 
-      const payload = {
-        action: 'checkout',
-        room: selectedResident.room,
-        passport: selectedResident.passport,
-        todayStr: formatDate(today) // Định dạng dd/mm/yyyy đẩy về Script
-      };
+  // Tạo URL chứa toàn bộ tham số cần thiết
+  const urlWithParams = `${POST_URL}?action=checkout&room=${encodeURIComponent(selectedResident.room)}&passport=${encodeURIComponent(selectedResident.passport)}&todayStr=${encodeURIComponent(formatDate(today))}`;
 
-      try {
-        // Thực hiện gửi request POST trực tiếp lên Apps Script để sửa dữ liệu
-        const res = await fetch(POST_URL, {
-          method: 'POST',
-          mode: 'no-cors', // Sử dụng no-cors nếu Apps Script không bật CORS, hệ thống Google vẫn ghi nhận lệnh
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+  try {
+    // Sử dụng fetch GET thông thường, không sợ bị chặn CORS trên GitHub Pages nữa
+    await fetch(urlWithParams, { method: 'GET' });
 
-        // Đợi 2.5 giây tối ưu cho luồng dữ liệu Google Drive đồng bộ, sau đó tải lại dashboard
-        setTimeout(async () => {
-          await loadDashboard();
-        }, 2500);
+    // Chờ 2.5 giây để Google đồng bộ dữ liệu nội bộ rồi tải lại dashboard trực tiếp từ sheet
+    setTimeout(async () => {
+      await loadDashboard();
+    }, 2500);
 
-      } catch (error) {
-        console.error(error);
-        alert('Có lỗi xảy ra khi đồng bộ Google Sheet.');
-        hideLoading();
-      }
-    }
+  } catch (error) {
+    console.error(error);
+    alert('Có lỗi xảy ra khi đồng bộ Google Sheet.');
+    hideLoading();
+  }
+}
 
-    // HÀM CHỨC NĂNG REALTIME: GIA HẠN HỢP ĐỒNG CHỜ DUYỆT (ĐỔI MÀU TÍM)
-    async function submitExtend(months) {
-      if (!selectedResident) return;
-      
-      closeModal();
-      showLoading(`Đang đăng ký gia hạn ${months} tháng...`);
+// HÀM CHỨC NĂNG REALTIME: GIA HẠN HỢP ĐỒNG (GỌI QUA GET)
+async function submitExtend(months) {
+  if (!selectedResident) return;
+  
+  closeModal();
+  showLoading(`Đang đăng ký gia hạn ${months} tháng...`);
 
-      const payload = {
-        action: 'extend',
-        room: selectedResident.room,
-        passport: selectedResident.passport,
-        months: months
-      };
+  const urlWithParams = `${POST_URL}?action=extend&room=${encodeURIComponent(selectedResident.room)}&passport=${encodeURIComponent(selectedResident.passport)}&months=${months}`;
 
-      try {
-        await fetch(POST_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+  try {
+    await fetch(urlWithParams, { method: 'GET' });
 
-        setTimeout(async () => {
-          await loadDashboard();
-        }, 2500);
+    setTimeout(async () => {
+      await loadDashboard();
+    }, 2500);
 
-      } catch (error) {
-        console.error(error);
-        alert('Có lỗi xảy ra khi đồng bộ yêu cầu gia hạn.');
-        hideLoading();
-      }
-    }
+  } catch (error) {
+    console.error(error);
+    alert('Có lỗi xảy ra khi đồng bộ yêu cầu gia hạn.');
+    hideLoading();
+  }
+}
 
     // Khởi chạy hệ thống tự động tải và lập lịch làm mới mỗi 60 giây
     loadDashboard();
