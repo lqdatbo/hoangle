@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hand FX V4 Ultimate - Fixed</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-family:system-ui}
+#cam{position:fixed;inset:0}
+video,canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+#ui{
+position:fixed;top:10px;left:50%;transform:translateX(-50%);
+color:white;text-align:center;background:rgba(0,0,0,.5);
+padding:10px 18px;border-radius:16px;backdrop-filter:blur(10px);
+z-index: 10;min-width: 150px;
+}
+#start{padding:10px 20px;border:none;border-radius:10px;cursor:pointer;background:#00d4ff;color:#000;font-weight:bold;margin-top:5px}
+</style>
+</head>
+<body>
+
+<div id="cam">
+<video id="video" autoplay playsinline muted></video>
+<canvas id="fx"></canvas>
+</div>
+
+<div id="ui">
+<div id="combo">Ready</div>
+<button id="start">Start Camera</button>
+</div>
+
+<script>
+const video=document.getElementById("video");
+const canvas=document.getElementById("fx");
+const ctx=canvas.getContext("2d");
+const combo=document.getElementById("combo");
+
+let particles=[];
+
+function resize(){
+ canvas.width=innerWidth;
+ canvas.height=innerHeight;
+}
+resize();
+addEventListener("resize",resize);
+
+// SỬA LỖI: Kiểm tra ngón tay duỗi thẳng bằng cách so sánh tọa độ Y đơn giản
+// Trong hệ tọa độ của MediaPipe, gốc (0,0) ở góc trên bên trái, nên ngón duỗi thẳng thì Tip có Y nhỏ hơn MCP
+function isFingerExtended(lm, tipIdx, mcpIdx) {
+  return lm[tipIdx].y < lm[mcpIdx].y;
+}
+
+function addTrail(x,y,color){
+ particles.push({
+   x, y,
+   vx:(Math.random()-.5)*5, // Tăng tốc độ bay một chút cho đẹp
+   vy:(Math.random()-.5)*5,
+   life:1,
+   color
+ });
+}
+
+function renderParticles(){
+ for(let i=particles.length-1;i>=0;i--){
+   const p=particles[i];
+   ctx.beginPath();
+   ctx.arc(p.x,p.y,Math.max(1, 15*p.life),0,Math.PI*2);
+   
+   const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,Math.max(1, 20*p.life));
+   g.addColorStop(0,"rgba(255,255,255,"+p.life+")");
+   g.addColorStop(1,p.color);
+   
+   ctx.fillStyle=g;
+   ctx.fill();
+   p.x+=p.vx;
+   p.y+=p.vy;
+   p.life-=0.02; // Giảm nhẹ tốc độ mất hạt để hiệu ứng mượt hơn
+   if(p.life<=0) particles.splice(i,1);
+ }
+}
+
+function activePoint(x,y,color){
+ ctx.beginPath();
+ ctx.arc(x,y,15,0,Math.PI*2);
+ ctx.fillStyle=color;
+ ctx.shadowBlur=25;
+ ctx.shadowColor=color;
+ ctx.fill();
+ ctx.shadowBlur=0;
+
+ for(let i=0;i<3;i++) addTrail(x,y,color);
+}
+
+function process(results){
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+ let currentGesture = "Ready";
+
+ if(results.multiHandLandmarks && results.multiHandLandmarks.length > 0){
+   for(const lm of results.multiHandLandmarks){
+
+     // Đầu ngón trỏ (8) vs Khớp gốc ngón trỏ (5)
+     const idx = isFingerExtended(lm, 8, 5);
+     // Đầu ngón giữa (12) vs Khớp gốc ngón giữa (9)
+     const mid = isFingerExtended(lm, 12, 9);
+     // Đầu ngón út (20) vs Khớp gốc ngón út (17)
+     const pnk = isFingerExtended(lm, 20, 17);
+
+     // Lấy tọa độ cổ tay (lm[0]) hoặc khớp ngón để tính toán nếu cần, 
+     // Ở đây tính trực tiếp từ đầu ngón tay duỗi
+     if(idx){
+        const x=(1-lm[8].x)*canvas.width;
+        const y=lm[8].y*canvas.height;
+        activePoint(x,y,"#ff7b00");
+        currentGesture = "🌀 Portal";
+     }
+
+     if(mid){
+        const x=(1-lm[12].x)*canvas.width;
+        const y=lm[12].y*canvas.height;
+        activePoint(x,y,"#00d4ff");
+        currentGesture = "🔵 Bubble";
+     }
+
+     if(pnk){
+        const x=(1-lm[20].x)*canvas.width;
+        const y=lm[20].y*canvas.height;
+        activePoint(x,y,"#d86dff");
+        currentGesture = "✨ Star Dust";
+     }
+   }
+ }
+
+ combo.innerText = currentGesture;
+ renderParticles();
+}
+
+document.getElementById("start").onclick=async()=>{
+ try {
+   const stream=await navigator.mediaDevices.getUserMedia({
+     video:{ facingMode:"user", width:{ideal:1280}, height:{ideal:720} }
+   });
+   video.srcObject=stream;
+ } catch (err) {
+   alert("Không thể truy cập Camera: " + err.message);
+   return;
+ }
+
+ const hands=new Hands({
+   locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+ });
+
+ hands.setOptions({
+   maxNumHands:2,
+   modelComplexity:1, // Chuyển xuống 1 để xử lý mượt hơn trên nhiều thiết bị
+   minDetectionConfidence:0.7, // Giảm nhẹ để dễ nhận diện ở môi trường thiếu sáng
+   minTrackingConfidence:0.7
+ });
+
+ hands.onResults(process);
+
+ const camera=new Camera(video,{
+   onFrame:async()=>{
+      await hands.send({image:video});
+   },
+   width:1280,
+   height:720
+ });
+
+ camera.start();
+ document.getElementById("start").style.display="none";
+};
+</script>
+</body>
+</html>
