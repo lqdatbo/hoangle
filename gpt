@@ -1,0 +1,109 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#000}
+video,canvas{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+#status{position:fixed;top:10px;left:10px;color:#fff;background:rgba(0,0,0,.5);padding:8px;border-radius:8px;z-index:10}
+button{position:fixed;top:60px;left:10px;z-index:10}
+</style>
+</head>
+<body>
+<div id="status">Ready</div>
+<button id="start">Start</button>
+<video id="video" autoplay playsinline muted></video>
+<canvas id="fx"></canvas>
+
+<script>
+const video=document.getElementById('video');
+const canvas=document.getElementById('fx');
+const ctx=canvas.getContext('2d');
+const statusEl=document.getElementById('status');
+
+function resize(){
+ canvas.width=window.innerWidth;
+ canvas.height=window.innerHeight;
+}
+resize();
+window.addEventListener('resize',resize);
+
+function fingerUp(lm,tip,pip){
+ return lm[tip].y < lm[pip].y - 0.03;
+}
+
+function drawGlow(x,y,color){
+ ctx.beginPath();
+ ctx.arc(x,y,20,0,Math.PI*2);
+ ctx.fillStyle=color;
+ ctx.shadowColor=color;
+ ctx.shadowBlur=30;
+ ctx.fill();
+ ctx.shadowBlur=0;
+}
+
+async function startCam(){
+ try{
+   const stream=await navigator.mediaDevices.getUserMedia({video:true});
+   video.srcObject=stream;
+
+   const hands=new Hands({
+      locateFile:(f)=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+   });
+
+   hands.setOptions({
+      maxNumHands:2,
+      modelComplexity:1,
+      minDetectionConfidence:0.7,
+      minTrackingConfidence:0.7
+   });
+
+   hands.onResults((results)=>{
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+
+      if(!results.multiHandLandmarks){
+         statusEl.textContent="No hand detected";
+         return;
+      }
+
+      statusEl.textContent=`Hands: ${results.multiHandLandmarks.length}`;
+
+      for(const lm of results.multiHandLandmarks){
+
+         if(fingerUp(lm,8,6)){
+            drawGlow((1-lm[8].x)*canvas.width,lm[8].y*canvas.height,"orange");
+         }
+
+         if(fingerUp(lm,12,10)){
+            drawGlow((1-lm[12].x)*canvas.width,lm[12].y*canvas.height,"cyan");
+         }
+
+         if(fingerUp(lm,20,18)){
+            drawGlow((1-lm[20].x)*canvas.width,lm[20].y*canvas.height,"violet");
+         }
+      }
+   });
+
+   const camera=new Camera(video,{
+      onFrame:async()=>{
+         await hands.send({image:video});
+      },
+      width:640,
+      height:480
+   });
+
+   camera.start();
+   statusEl.textContent="Camera running";
+ }catch(e){
+   statusEl.textContent="Error: "+e.message;
+ }
+}
+
+document.getElementById('start').onclick=startCam;
+</script>
+</body>
+</html>
