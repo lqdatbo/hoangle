@@ -1,396 +1,176 @@
-
-<style>
-  h2.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
-  *{box-sizing:border-box}
-  #wrap{width:100%;max-width:680px;margin:0 auto;padding:.75rem 0;font-family:system-ui,sans-serif}
-  #cam-box{position:relative;width:100%;aspect-ratio:4/3;border-radius:12px;overflow:hidden;background:#080810}
-  video,canvas{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover}
-  video{transform:scaleX(-1)}
-  #lm-canvas,#fx-canvas{transform:scaleX(-1);pointer-events:none}
-  #status{font-size:13px;color:var(--color-text-secondary);text-align:center;margin:10px 0 6px;min-height:18px}
-  #combo-label{text-align:center;font-size:15px;font-weight:600;min-height:24px;margin:4px 0;color:var(--color-text-primary)}
-
-  /* mode toggle */
-  #mode-row{display:flex;gap:8px;justify-content:center;margin:8px 0}
-  .mode-btn{padding:6px 20px;font-size:13px;font-weight:500;border-radius:99px;border:1.5px solid var(--color-border-secondary);cursor:pointer;background:transparent;color:var(--color-text-secondary);transition:all .15s}
-  .mode-btn.active{background:var(--color-text-primary);color:var(--color-background-primary);border-color:transparent}
-
-  /* legend */
-  #legend{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:6px 0 10px}
-  .leg{font-size:12px;padding:3px 11px;border-radius:99px;border:.5px solid var(--color-border-tertiary);color:var(--color-text-secondary);background:var(--color-background-secondary)}
-
-  #btn{display:block;margin:0 auto;padding:7px 22px;font-size:14px;border-radius:8px;cursor:pointer}
-</style>
-
-<h2 class="sr-only">Hand FX — 2 mode: Finger Effects & Zone Filter</h2>
-<div id="wrap">
-  <div id="cam-box">
-    <video id="vid" autoplay playsinline muted></video>
-    <canvas id="lm-canvas"></canvas>
-    <canvas id="fx-canvas"></canvas>
-  </div>
-  <div id="status">Nhấn nút để bật camera</div>
-  <div id="combo-label"></div>
-
-  <div id="mode-row">
-    <button class="mode-btn active" id="m-finger" onclick="setMode('finger')">✨ Finger Effects</button>
-    <button class="mode-btn" id="m-zone" onclick="setMode('zone')">🔮 Zone Filter</button>
-  </div>
-
-  <div id="legend"></div>
-  <button id="btn">Bật camera</button>
-</div>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hand FX V4 Ultimate</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-<script>
-const vid=document.getElementById('vid');
-const lmC=document.getElementById('lm-canvas');
-const fxC=document.getElementById('fx-canvas');
-const lmX=lmC.getContext('2d');
-const fxX=fxC.getContext('2d');
-const statusEl=document.getElementById('status');
-const comboLbl=document.getElementById('combo-label');
-const btn=document.getElementById('btn');
-const legendEl=document.getElementById('legend');
 
-// ── MODE ──
-let currentMode='finger';
-const LEGENDS={
-  finger:`<span class="leg">👍 Cái → Sét tím</span><span class="leg">☝️ Trỏ → Portal</span><span class="leg">🖕 Giữa → Bong bóng</span><span class="leg">🤙 Út → Tinh tú</span>`,
-  zone:`<span class="leg">Trỏ+Giữa 2 tay → 🟫 Pixel</span><span class="leg">Cái+Trỏ 2 tay → 🌈 Neon</span><span class="leg">Trỏ+Út 2 tay → 🔮 Glass</span><span class="leg">Giữa+Áp út 2 tay → 🎨 Sketch</span>`
-};
-function setMode(m){
-  currentMode=m;
-  document.getElementById('m-finger').classList.toggle('active',m==='finger');
-  document.getElementById('m-zone').classList.toggle('active',m==='zone');
-  legendEl.innerHTML=LEGENDS[m];
-  comboLbl.textContent='';
-  particles=[];
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-family:system-ui}
+#cam{position:fixed;inset:0}
+video,canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+#ui{
+position:fixed;top:10px;left:50%;transform:translateX(-50%);
+color:white;text-align:center;background:rgba(0,0,0,.35);
+padding:10px 18px;border-radius:16px;backdrop-filter:blur(10px)
 }
-legendEl.innerHTML=LEGENDS['finger'];
+#start{padding:10px 20px;border:none;border-radius:10px;cursor:pointer}
+</style>
+</head>
+<body>
 
-// ── SKELETON COLORS ──
-const FC=['#c084fc','#f97316','#38bdf8','#f472b6','#fbbf24'];
-const CONN=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
+<div id="cam">
+<video id="video" autoplay playsinline muted></video>
+<canvas id="fx"></canvas>
+</div>
 
-// ── PARTICLES ──
+<div id="ui">
+<div id="combo">Ready</div>
+<button id="start">Start Camera</button>
+</div>
+
+<script>
+const video=document.getElementById("video");
+const canvas=document.getElementById("fx");
+const ctx=canvas.getContext("2d");
+const combo=document.getElementById("combo");
+
+let history=[];
+
+function resize(){
+ canvas.width=innerWidth;
+ canvas.height=innerHeight;
+}
+resize();
+addEventListener("resize",resize);
+
+function fingerExtended(lm,mcp,pip,dip,tip){
+ const a=Math.atan2(lm[pip].y-lm[mcp].y,lm[pip].x-lm[mcp].x);
+ const b=Math.atan2(lm[tip].y-lm[dip].y,lm[tip].x-lm[dip].x);
+ return Math.abs(a-b)<0.5;
+}
+
+function stableGesture(name){
+ history.push(name);
+ if(history.length>12) history.shift();
+
+ let count=0;
+ for(const h of history){
+   if(h===name) count++;
+ }
+ return count>=8;
+}
+
 let particles=[];
 
-function spawnBubble(x,y){
-  particles.push({type:'bub',x,y,vx:(Math.random()-.5)*.5,vy:-(1+Math.random()*1.2),life:1,r:12+Math.random()*16,hue:180+Math.random()*60});
-}
-function spawnSparkle(x,y){
-  for(let i=0;i<5;i++){
-    const a=Math.random()*Math.PI*2,s=.8+Math.random()*2;
-    particles.push({type:'sp',x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,r:2+Math.random()*3,hue:40+Math.random()*260});
-  }
+function addTrail(x,y,color){
+ particles.push({x,y,vx:(Math.random()-.5)*2,vy:(Math.random()-.5)*2,life:1,color});
 }
 
-// ── LIGHTNING ──
-function lightningSegment(ctx,x1,y1,x2,y2,depth,spread){
-  if(depth===0){ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();return;}
-  const mx=(x1+x2)/2+(Math.random()-.5)*spread;
-  const my=(y1+y2)/2+(Math.random()-.5)*spread;
-  lightningSegment(ctx,x1,y1,mx,my,depth-1,spread*.6);
-  lightningSegment(ctx,mx,my,x2,y2,depth-1,spread*.6);
-}
-function drawLightningBolt(cx,cy){
-  const branches=4+Math.floor(Math.random()*2);
-  for(let b=0;b<branches;b++){
-    const a=-Math.PI/2+(Math.random()-.5)*Math.PI*.9;
-    const len=40+Math.random()*55;
-    const ex=cx+Math.cos(a)*len,ey=cy+Math.sin(a)*len;
-    fxX.save();
-    fxX.strokeStyle='rgba(200,150,255,0.18)';fxX.lineWidth=6;
-    lightningSegment(fxX,cx,cy,ex,ey,3,28);
-    fxX.strokeStyle='rgba(220,170,255,0.85)';fxX.lineWidth=1.6;
-    fxX.shadowColor='#bf80ff';fxX.shadowBlur=12;
-    lightningSegment(fxX,cx,cy,ex,ey,3,22);
-    fxX.strokeStyle='rgba(255,255,255,0.7)';fxX.lineWidth=.6;fxX.shadowBlur=4;
-    lightningSegment(fxX,cx,cy,ex,ey,2,14);
-    fxX.restore();
-  }
-  fxX.save();
-  fxX.beginPath();fxX.arc(cx,cy,6+Math.random()*4,0,Math.PI*2);
-  fxX.strokeStyle='rgba(200,140,255,0.9)';fxX.lineWidth=1.5;
-  fxX.shadowColor='#bf80ff';fxX.shadowBlur=10;fxX.stroke();
-  fxX.restore();
+function renderParticles(){
+ for(let i=particles.length-1;i>=0;i--){
+   const p=particles[i];
+   ctx.beginPath();
+   ctx.arc(p.x,p.y,12*p.life,0,Math.PI*2);
+   const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,20);
+   g.addColorStop(0,"rgba(255,255,255,"+p.life+")");
+   g.addColorStop(1,p.color);
+   ctx.fillStyle=g;
+   ctx.fill();
+   p.x+=p.vx;
+   p.y+=p.vy;
+   p.life-=0.03;
+   if(p.life<=0) particles.splice(i,1);
+ }
 }
 
-// ── PORTAL ──
-let portalAngle=0;
-function drawPortal(cx,cy){
-  fxX.save();
-  for(let r=0;r<4;r++){
-    fxX.beginPath();
-    fxX.ellipse(cx,cy,24+r*10,(24+r*10)*.42,portalAngle+r*.4,0,Math.PI*2);
-    fxX.strokeStyle=`rgba(255,${100+r*20},0,${.18-r*.03})`;
-    fxX.lineWidth=8-r;fxX.stroke();
-  }
-  const ringCols=['rgba(255,110,0,.95)','rgba(160,40,255,.85)','rgba(255,200,60,.7)'];
-  for(let r=0;r<3;r++){
-    fxX.beginPath();
-    fxX.ellipse(cx,cy,22+r*9,(22+r*9)*.4,portalAngle*(1+r*.3),0,Math.PI*2);
-    fxX.strokeStyle=ringCols[r];fxX.lineWidth=2.5-r*.5;
-    fxX.shadowColor=ringCols[r];fxX.shadowBlur=8;fxX.stroke();
-  }
-  for(let s=0;s<10;s++){
-    const sa=portalAngle*2.5+s*(Math.PI/5);
-    const r1=26,r2=40+Math.random()*10;
-    fxX.beginPath();
-    fxX.moveTo(cx+Math.cos(sa)*r1,cy+Math.sin(sa)*r1*.4);
-    fxX.lineTo(cx+Math.cos(sa)*r2,cy+Math.sin(sa)*r2*.4);
-    fxX.strokeStyle=`hsl(${20+s*18},100%,70%)`;fxX.lineWidth=1.2;
-    fxX.shadowColor='orange';fxX.shadowBlur=6;fxX.stroke();
-  }
-  const grad=fxX.createRadialGradient(cx,cy,0,cx,cy,18);
-  grad.addColorStop(0,'rgba(255,160,0,.35)');
-  grad.addColorStop(1,'rgba(100,0,200,0)');
-  fxX.beginPath();fxX.ellipse(cx,cy,18,8,portalAngle,0,Math.PI*2);
-  fxX.fillStyle=grad;fxX.fill();
-  fxX.restore();
+function activePoint(x,y,color){
+ ctx.beginPath();
+ ctx.arc(x,y,18,0,Math.PI*2);
+ ctx.fillStyle=color;
+ ctx.shadowBlur=30;
+ ctx.shadowColor=color;
+ ctx.fill();
+ ctx.shadowBlur=0;
+
+ for(let i=0;i<4;i++) addTrail(x,y,color);
 }
 
-// ── DRAW PARTICLES ──
-function drawParticles(){
-  particles=particles.filter(p=>p.life>0.02);
-  for(const p of particles){
-    if(p.type==='bub'){
-      fxX.save();
-      const a=p.life*.7;
-      const g=fxX.createRadialGradient(p.x-p.r*.3,p.y-p.r*.3,p.r*.05,p.x,p.y,p.r);
-      g.addColorStop(0,`rgba(255,255,255,${a*.5})`);
-      g.addColorStop(.4,`rgba(${120+p.hue%80},220,255,${a*.15})`);
-      g.addColorStop(1,'rgba(100,180,255,0)');
-      fxX.beginPath();fxX.arc(p.x,p.y,p.r,0,Math.PI*2);
-      fxX.fillStyle=g;fxX.fill();
-      fxX.strokeStyle=`rgba(150,230,255,${a*.9})`;fxX.lineWidth=1.4;fxX.stroke();
-      fxX.beginPath();fxX.arc(p.x-p.r*.32,p.y-p.r*.32,p.r*.18,0,Math.PI*2);
-      fxX.fillStyle=`rgba(255,255,255,${a*.8})`;fxX.fill();
-      fxX.restore();
-      p.x+=p.vx;p.y+=p.vy;p.vy+=.01;p.r+=.15;p.life-=.007;
-    } else if(p.type==='sp'){
-      fxX.save();
-      fxX.beginPath();
-      for(let k=0;k<8;k++){
-        const ang=k*Math.PI/4+p.life*4;
-        const rad=k%2===0?p.r*3.5*p.life:p.r*p.life;
-        k===0?fxX.moveTo(p.x+Math.cos(ang)*rad,p.y+Math.sin(ang)*rad):fxX.lineTo(p.x+Math.cos(ang)*rad,p.y+Math.sin(ang)*rad);
-      }
-      fxX.closePath();
-      fxX.fillStyle=`hsla(${p.hue},100%,78%,${p.life*.9})`;
-      fxX.shadowColor=`hsl(${p.hue},100%,70%)`;fxX.shadowBlur=6;fxX.fill();
-      fxX.restore();
-      p.x+=p.vx;p.y+=p.vy;p.vy-=.04;p.life-=.018;
-    }
-  }
+function process(results){
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+
+ if(results.multiHandLandmarks){
+   for(const lm of results.multiHandLandmarks){
+
+     const idx=fingerExtended(lm,5,6,7,8);
+     const mid=fingerExtended(lm,9,10,11,12);
+     const pnk=fingerExtended(lm,17,18,19,20);
+
+     if(idx){
+        const x=(1-lm[8].x)*canvas.width;
+        const y=lm[8].y*canvas.height;
+        activePoint(x,y,"#ff7b00");
+        if(stableGesture("portal")) combo.innerText="🌀 Portal";
+     }
+
+     if(mid){
+        const x=(1-lm[12].x)*canvas.width;
+        const y=lm[12].y*canvas.height;
+        activePoint(x,y,"#00d4ff");
+        if(stableGesture("bubble")) combo.innerText="🔵 Bubble";
+     }
+
+     if(pnk){
+        const x=(1-lm[20].x)*canvas.width;
+        const y=lm[20].y*canvas.height;
+        activePoint(x,y,"#d86dff");
+        if(stableGesture("star")) combo.innerText="✨ Star Dust";
+     }
+   }
+ }
+
+ renderParticles();
 }
 
-// ── SKELETON ──
-function drawSkeleton(lm,W,H){
-  const pts=lm.map(p=>({x:p.x*W,y:p.y*H}));
-  for(const[a,b]of CONN){
-    const fi=b<=4?0:b<=8?1:b<=12?2:b<=16?3:4;
-    lmX.beginPath();lmX.moveTo(pts[a].x,pts[a].y);lmX.lineTo(pts[b].x,pts[b].y);
-    lmX.strokeStyle=FC[fi];lmX.lineWidth=2.2;lmX.stroke();
-  }
-  for(let i=0;i<pts.length;i++){
-    const fi=i<=4?0:i<=8?1:i<=12?2:i<=16?3:4;
-    lmX.beginPath();lmX.arc(pts[i].x,pts[i].y,i===0?7:4,0,Math.PI*2);
-    lmX.fillStyle=FC[fi];lmX.fill();
-    lmX.fillStyle='#fff';lmX.font='bold 7px sans-serif';lmX.textAlign='center';lmX.textBaseline='middle';
-    lmX.fillText(i,pts[i].x,pts[i].y);
-  }
-  return pts;
-}
+document.getElementById("start").onclick=async()=>{
 
-// ── THUMB DETECTION — cải thiện ──
-// Dùng 3 điều kiện: tip cao hơn MCP (knuckle), khoảng cách tip–index đủ xa, góc khớp đủ thẳng
-function isThumbUp(lm){
-  // 1. Tip phải cao hơn MCP (lm[2]) một ngưỡng đủ lớn
-  const tipAboveMCP = lm[4].y < lm[2].y - 0.04;
-  // 2. Tip phải ở xa ngón trỏ (không bị cuộn vào)
-  const distToIndex = Math.hypot(lm[4].x-lm[8].x, lm[4].y-lm[8].y);
-  const farFromIndex = distToIndex > 0.1;
-  // 3. Tip phải xa palm (lm[0])
-  const distToPalm = Math.hypot(lm[4].x-lm[0].x, lm[4].y-lm[0].y);
-  const farFromPalm = distToPalm > 0.12;
-  return tipAboveMCP && farFromIndex && farFromPalm;
-}
+ const stream=await navigator.mediaDevices.getUserMedia({
+   video:{
+      facingMode:"user",
+      width:{ideal:1280},
+      height:{ideal:720}
+   }
+ });
 
-function isUp(lm,tip,pip){return lm[tip].y<lm[pip].y-0.02;}
+ video.srcObject=stream;
 
-// ── ZONE FILTER ──
-let zoneCanvas=null,zoneCtx=null;
-function ensureZone(W,H){
-  if(!zoneCanvas) zoneCanvas=document.createElement('canvas');
-  zoneCanvas.width=W;zoneCanvas.height=H;
-  zoneCtx=zoneCanvas.getContext('2d');
-}
-function applyFilter(corners,type,W,H){
-  ensureZone(W,H);
-  zoneCtx.drawImage(vid,0,0,W,H);
-  const xs=corners.map(c=>c.x),ys=corners.map(c=>c.y);
-  const minX=Math.max(0,Math.min(...xs)-6),minY=Math.max(0,Math.min(...ys)-6);
-  const maxX=Math.min(W,Math.max(...xs)+6),maxY=Math.min(H,Math.max(...ys)+6);
-  const rw=Math.floor(maxX-minX),rh=Math.floor(maxY-minY);
-  if(rw<10||rh<10)return null;
-  let imgd=zoneCtx.getImageData(minX,minY,rw,rh);
-  const d=imgd.data;
-  if(type==='pixel'){
-    const ps=14;
-    for(let py=0;py<rh;py+=ps)for(let px=0;px<rw;px+=ps){
-      const idx=(py*rw+px)*4;const r=d[idx],g=d[idx+1],b=d[idx+2];
-      for(let dy=0;dy<ps&&py+dy<rh;dy++)for(let dx=0;dx<ps&&px+dx<rw;dx++){
-        const i2=((py+dy)*rw+(px+dx))*4;d[i2]=r;d[i2+1]=g;d[i2+2]=b;
-      }
-    }
-  } else if(type==='neon'){
-    for(let i=0;i<d.length;i+=4){
-      const lum=d[i]*.299+d[i+1]*.587+d[i+2]*.114;
-      d[i]=Math.min(255,lum*.2+d[i]*.1);
-      d[i+1]=Math.min(255,lum*.5+d[i+1]*.3+80);
-      d[i+2]=Math.min(255,lum*.3+d[i+2]*.2+120);
-    }
-  } else if(type==='glass'){
-    const src=new Uint8ClampedArray(d);
-    for(let py=0;py<rh;py++)for(let px=0;px<rw;px++){
-      const ox=Math.round((Math.random()-.5)*10),oy=Math.round((Math.random()-.5)*10);
-      const sx=Math.max(0,Math.min(rw-1,px+ox)),sy=Math.max(0,Math.min(rh-1,py+oy));
-      const si=(sy*rw+sx)*4,di=(py*rw+px)*4;
-      d[di]=src[si];d[di+1]=src[si+1];d[di+2]=src[si+2];
-    }
-  } else if(type==='sketch'){
-    const src=new Uint8ClampedArray(d);
-    for(let py=1;py<rh-1;py++)for(let px=1;px<rw-1;px++){
-      const i=(py*rw+px)*4;
-      const gx=src[i+4]-src[i-4],gy=src[i+rw*4]-src[i-rw*4];
-      const v=255-Math.min(255,Math.sqrt(gx*gx+gy*gy)*3.5);
-      d[i]=v;d[i+1]=v;d[i+2]=v;
-    }
-  }
-  return{imgd,minX,minY};
-}
+ const hands=new Hands({
+   locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+ });
 
-const COMBO_COLORS={pixel:'rgba(255,180,0,.9)',neon:'rgba(0,255,180,.9)',glass:'rgba(120,200,255,.9)',sketch:'rgba(200,200,200,.9)'};
+ hands.setOptions({
+   maxNumHands:2,
+   modelComplexity:2,
+   minDetectionConfidence:0.85,
+   minTrackingConfidence:0.85
+ });
 
-let frame=0,ltTimer=0,bubTimer=0,spTimer=0;
+ hands.onResults(process);
 
-function onResults(res){
-  const W=lmC.width,H=lmC.height;
-  lmX.clearRect(0,0,W,H);
-  fxX.clearRect(0,0,W,H);
-  portalAngle+=0.045;frame++;
-  comboLbl.textContent='';
+ const camera=new Camera(video,{
+   onFrame:async()=>{
+      await hands.send({image:video});
+   },
+   width:1280,
+   height:720
+ });
 
-  if(!res.multiHandLandmarks||res.multiHandLandmarks.length===0){
-    if(currentMode==='finger') drawParticles();
-    return;
-  }
-
-  const allHands=res.multiHandLandmarks;
-  const allPts=[];
-
-  for(let hi=0;hi<allHands.length;hi++){
-    const lm=allHands[hi];
-    const pts=drawSkeleton(lm,W,H);
-    allPts.push(pts);
-
-    if(currentMode==='finger'){
-      const thuUp=isThumbUp(lm);
-      const idxUp=isUp(lm,8,6);
-      const midUp=isUp(lm,12,10);
-      const pnkUp=isUp(lm,20,18);
-
-      // 👍 thumb → lightning (mỗi 2 frame)
-      if(thuUp){ltTimer++;if(ltTimer%2===0)drawLightningBolt(pts[4].x,pts[4].y);}
-      // ☝️ index → portal
-      if(idxUp) drawPortal(pts[8].x,pts[8].y);
-      // 🖕 middle → bubbles
-      if(midUp){bubTimer++;if(bubTimer%10===0)spawnBubble(pts[12].x,pts[12].y);}
-      // 🤙 pinky → sparkle
-      if(pnkUp){spTimer++;if(spTimer%2===0)spawnSparkle(pts[20].x,pts[20].y);}
-    }
-  }
-
-  if(currentMode==='finger'){drawParticles();return;}
-
-  // ── ZONE MODE ──
-  if(allHands.length>=2){
-    const lm0=allHands[0],lm1=allHands[1];
-    const p0=allPts[0],p1=allPts[1];
-    const i0=isUp(lm0,8,6),i1=isUp(lm1,8,6);
-    const m0=isUp(lm0,12,10),m1=isUp(lm1,12,10);
-    const r0=isUp(lm0,16,14),r1=isUp(lm1,16,14);
-    const k0=isUp(lm0,20,18),k1=isUp(lm1,20,18);
-    const t0=isThumbUp(lm0),t1=isThumbUp(lm1);
-
-    let combo=null,corners=null;
-    if(i0&&m0&&i1&&m1)      {combo='pixel'; corners=[p0[8],p0[12],p1[12],p1[8]];}
-    else if(t0&&i0&&t1&&i1) {combo='neon';  corners=[p0[4],p0[8], p1[8], p1[4]];}
-    else if(i0&&k0&&i1&&k1) {combo='glass'; corners=[p0[8],p0[20],p1[20],p1[8]];}
-    else if(m0&&r0&&m1&&r1) {combo='sketch';corners=[p0[12],p0[16],p1[16],p1[12]];}
-
-    if(combo&&corners){
-      const labels={pixel:'🟫 Pixel filter',neon:'🌈 Neon filter',glass:'🔮 Glass filter',sketch:'🎨 Sketch filter'};
-      comboLbl.textContent=labels[combo];
-      const result=applyFilter(corners,combo,W,H);
-      if(result){
-        ensureZone(W,H);
-        zoneCtx.putImageData(result.imgd,result.minX,result.minY);
-        fxX.save();
-        fxX.beginPath();
-        fxX.moveTo(corners[0].x,corners[0].y);
-        for(let ci=1;ci<corners.length;ci++) fxX.lineTo(corners[ci].x,corners[ci].y);
-        fxX.closePath();fxX.clip();
-        fxX.drawImage(zoneCanvas,0,0,W,H);
-        fxX.restore();
-        const gc=COMBO_COLORS[combo];
-        fxX.save();
-        fxX.beginPath();
-        fxX.moveTo(corners[0].x,corners[0].y);
-        for(let ci=1;ci<corners.length;ci++) fxX.lineTo(corners[ci].x,corners[ci].y);
-        fxX.closePath();
-        fxX.strokeStyle=gc;fxX.lineWidth=2.5;fxX.setLineDash([6,4]);
-        fxX.shadowColor=gc;fxX.shadowBlur=12;fxX.stroke();
-        for(const c of corners){
-          fxX.beginPath();fxX.arc(c.x,c.y,5,0,Math.PI*2);
-          fxX.fillStyle=gc;fxX.shadowBlur=8;fxX.fill();
-        }
-        fxX.restore();
-      }
-    } else {
-      comboLbl.textContent='Giơ 4 ngón tương ứng từ 2 tay';
-    }
-  } else {
-    comboLbl.textContent='Cần 2 tay để dùng Zone Filter';
-  }
-}
-
-btn.addEventListener('click',async()=>{
-  btn.disabled=true;
-  statusEl.textContent='Đang khởi động camera...';
-  try{
-    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:640,height:480}});
-    vid.srcObject=stream;
-    await new Promise(r=>vid.onloadedmetadata=r);
-    vid.play();
-    lmC.width=fxC.width=vid.videoWidth||640;
-    lmC.height=fxC.height=vid.videoHeight||480;
-    const hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
-    hands.setOptions({maxNumHands:2,modelComplexity:1,minDetectionConfidence:0.7,minTrackingConfidence:0.6});
-    hands.onResults(onResults);
-    const camera=new Camera(vid,{
-      onFrame:async()=>{await hands.send({image:vid});},
-      width:lmC.width,height:lmC.height
-    });
-    camera.start();
-    statusEl.textContent='Sẵn sàng!';
-    btn.style.display='none';
-  }catch(e){
-    statusEl.textContent='Không thể truy cập camera — hãy cho phép quyền camera.';
-    btn.disabled=false;
-  }
-});
+ camera.start();
+ document.getElementById("start").style.display="none";
+};
 </script>
+</body>
+</html>
